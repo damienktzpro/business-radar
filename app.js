@@ -2,14 +2,13 @@ const state = {
   items: [],
   view: "Pour toi",
   category: "Tout",
+  confidence: "Fiables",
   query: "",
   stats: {},
-  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV22") || "[]")),
-  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV22") || "{}"),
+  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
+  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
 };
 
-// V2.2: every trusted link must point directly to an explicitly allowed domain.
-// No Google News redirector and no arbitrary founder website in the trusted feed.
 const SAFE_HOSTS = [
   "presse.bpifrance.fr",
   "bpifrance.fr",
@@ -28,10 +27,12 @@ const empty = document.querySelector("#empty");
 const counter = document.querySelector("#counter");
 const updated = document.querySelector("#updated");
 const filters = document.querySelector("#filters");
+const confidenceFilters = document.querySelector("#confidence-filters");
 const tabs = document.querySelector("#tabs");
 const search = document.querySelector("#search");
 const template = document.querySelector("#card-template");
 const stats = document.querySelector("#stats");
+const briefText = document.querySelector("#brief-text");
 
 function timeAgo(iso) {
   const seconds = Math.max(1, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -58,8 +59,8 @@ function isSafeBrowserLink(rawUrl) {
 }
 
 function savePersonalization() {
-  localStorage.setItem("businessRadarFavoritesV22", JSON.stringify([...state.favorites]));
-  localStorage.setItem("businessRadarPreferencesV22", JSON.stringify(state.preferences));
+  localStorage.setItem("businessRadarFavoritesV23", JSON.stringify([...state.favorites]));
+  localStorage.setItem("businessRadarPreferencesV23", JSON.stringify(state.preferences));
 }
 
 function personalizationTags(item) {
@@ -102,8 +103,14 @@ function renderFilters() {
   });
 }
 
+function renderConfidenceFilters() {
+  [...confidenceFilters.querySelectorAll("button")].forEach(button => {
+    button.classList.toggle("active", button.dataset.confidence === state.confidence);
+  });
+}
+
 function isVerified(item) {
-  return ["official", "editorial"].includes(item.trust);
+  return ["official", "reference", "editorial"].includes(item.trust);
 }
 
 function matchesView(item) {
@@ -117,13 +124,23 @@ function matchesView(item) {
   return isVerified(item);
 }
 
+function matchesConfidence(item) {
+  const level = item.confidence_level || "selected";
+  if (state.confidence === "Fiables") return !["discovery", "conflict"].includes(level);
+  if (state.confidence === "Confirmés") return ["confirmed", "official_confirmed"].includes(level);
+  if (state.confidence === "Officiels") return ["official", "official_confirmed"].includes(level);
+  if (state.confidence === "Source unique") return level === "selected";
+  if (state.confidence === "À vérifier") return ["conflict", "discovery"].includes(level);
+  return true;
+}
+
 function visibleItems() {
   const q = state.query.trim().toLowerCase();
   return state.items
     .filter(item => {
       const catOk = state.category === "Tout" || (item.categories || []).includes(state.category);
-      const haystack = `${item.title} ${item.summary || ""} ${item.why || ""} ${(item.categories || []).join(" ")} ${item.source} ${item.region || ""}`.toLowerCase();
-      return matchesView(item) && catOk && (!q || haystack.includes(q));
+      const haystack = `${item.title} ${item.summary || ""} ${item.why || ""} ${(item.categories || []).join(" ")} ${item.source} ${item.region || ""} ${(item.confirmation_sources || []).join(" ")}`.toLowerCase();
+      return matchesView(item) && matchesConfidence(item) && catOk && (!q || haystack.includes(q));
     })
     .sort((a, b) => ((b.score || 0) + personalBoost(b)) - ((a.score || 0) + personalBoost(a)));
 }
@@ -134,20 +151,54 @@ function renderTabs() {
   });
 }
 
+function statCard(value, label, tone = "") {
+  return `<div class="stat-card ${tone}"><strong>${value}</strong><span>${label}</span></div>`;
+}
+
 function renderStats() {
   const s = state.stats || {};
-  const checked = Number(s.links_checked || 0);
+  const active = Number(s.sources_active || s.sources || 0);
+  const expected = Number(s.sources_expected || active);
+  const confirmed = Number(s.confirmed || 0);
+  const official = Number(s.official || 0);
   const blocked = Number(s.links_blocked || 0);
+  const conflicts = Number(s.conflicts || 0);
   stats.innerHTML = [
-    s.sources ? `<span><strong>${s.sources}</strong> sources actives</span>` : "",
-    s.confirmed ? `<span><strong>${s.confirmed}</strong> signaux multi-confirmés</span>` : "",
-    s.official ? `<span><strong>${s.official}</strong> sources officielles</span>` : "",
-    checked ? `<span><strong>${checked}</strong> liens contrôlés · <strong>${blocked}</strong> bloqué${blocked > 1 ? "s" : ""}</span>` : "",
-  ].filter(Boolean).join("");
+    statCard(`${active}/${expected}`, "sources actives", active === expected ? "good" : "warn"),
+    statCard(confirmed, "multi-confirmés", confirmed ? "good" : ""),
+    statCard(official, "signaux officiels", official ? "official" : ""),
+    statCard(blocked, "liens bloqués", blocked ? "warn" : "good"),
+  ].join("");
+
+  const failed = Number(s.sources_failed || 0);
+  const checked = Number(s.links_checked || 0);
+  briefText.textContent = failed
+    ? `${confirmed} signal${confirmed > 1 ? "aux" : ""} confirmé${confirmed > 1 ? "s" : ""} · ${conflicts} divergence${conflicts > 1 ? "s" : ""} détectée${conflicts > 1 ? "s" : ""} · ${failed} source${failed > 1 ? "s" : ""} temporairement indisponible${failed > 1 ? "s" : ""}.`
+    : `${confirmed} signal${confirmed > 1 ? "aux" : ""} confirmé${confirmed > 1 ? "s" : ""} · ${official} signal${official > 1 ? "aux" : ""} officiel${official > 1 ? "s" : ""} · ${checked} liens contrôlés · aucune source en erreur.`;
 }
 
 function confidenceClass(level) {
-  return ["official", "confirmed", "selected", "discovery"].includes(level) ? level : "selected";
+  return ["official", "official_confirmed", "confirmed", "selected", "discovery", "conflict"].includes(level) ? level : "selected";
+}
+
+function sourceInitial(source) {
+  const words = String(source || "BR").replace(/[^A-Za-zÀ-ÿ0-9 ]/g, " ").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "BR";
+  return (words.length === 1 ? words[0].slice(0, 2) : `${words[0][0]}${words[1][0]}`).toUpperCase();
+}
+
+function verificationTitle(item) {
+  if (item.confidence_level === "conflict") return "Information à recouper";
+  if (["official", "official_confirmed"].includes(item.confidence_level)) return "Provenance officielle";
+  if (item.confidence_level === "confirmed") return "Information recoupée";
+  if (item.confidence_level === "discovery") return "Signal de découverte";
+  return "Source éditoriale sélectionnée";
+}
+
+function makeConfirmationLink(source) {
+  const safe = source && source.url && isSafeBrowserLink(source.url);
+  if (!safe) return "";
+  return `<a href="${escapeAttr(source.url)}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(source.domain || source.source || "Source")}">${escapeHtml(source.source || source.domain || "Source")} <span>↗</span></a>`;
 }
 
 function render() {
@@ -160,12 +211,14 @@ function render() {
     const node = template.content.cloneNode(true);
     const article = node.querySelector(".card");
     if (index === 0) article.classList.add("featured");
+    article.dataset.confidence = confidenceClass(item.confidence_level);
 
+    node.querySelector(".source-mark").textContent = sourceInitial(item.source);
     node.querySelector(".source").textContent = item.source;
     node.querySelector(".age").textContent = timeAgo(item.published_at);
     node.querySelector(".score").textContent = `${item.score}/100`;
     node.querySelector(".interest").textContent = item.interest || "À surveiller";
-    node.querySelector("h2").textContent = item.title;
+    node.querySelector("h3").textContent = item.title;
 
     const trust = node.querySelector(".trust");
     trust.textContent = item.trust_label || "Source filtrée";
@@ -179,11 +232,12 @@ function render() {
     node.querySelector(".summary").textContent = item.summary || "Résumé indisponible.";
     node.querySelector(".why-text").textContent = item.why || "Signal business à surveiller.";
 
-    const sourceNames = (item.confirmation_sources || []).filter(Boolean);
-    const note = node.querySelector(".confidence-note");
-    note.textContent = item.confirmation_count > 1
-      ? `${item.confidence_note || "Signal confirmé."} Sources : ${sourceNames.join(" · ")}.`
-      : (item.confidence_note || "");
+    node.querySelector(".verification-title").textContent = verificationTitle(item);
+    node.querySelector(".confidence-note").textContent = item.confidence_note || "";
+    const sourceLinks = (item.confirmation_links || []).map(makeConfirmationLink).filter(Boolean);
+    const linksWrap = node.querySelector(".confirmation-links");
+    linksWrap.innerHTML = sourceLinks.join("");
+    if (!sourceLinks.length) linksWrap.hidden = true;
 
     const primaryTags = [];
     if (item.event && item.event !== "Business") primaryTags.push(item.event);
@@ -245,6 +299,10 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function escapeAttr(text) {
+  return String(text || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 async function load() {
   try {
     const response = await fetch(`data/feed.json?v=${Date.now()}`);
@@ -255,6 +313,7 @@ async function load() {
     updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · sources directes uniquement · automatique toutes les 6 h`;
     renderStats();
     renderFilters();
+    renderConfidenceFilters();
     renderTabs();
     render();
   } catch (error) {
@@ -268,8 +327,18 @@ tabs.addEventListener("click", event => {
   if (!button) return;
   state.view = button.dataset.view;
   state.category = "Tout";
+  state.confidence = state.view === "Découverte" ? "À vérifier" : "Fiables";
   renderTabs();
   renderFilters();
+  renderConfidenceFilters();
+  render();
+});
+
+confidenceFilters.addEventListener("click", event => {
+  const button = event.target.closest("button[data-confidence]");
+  if (!button) return;
+  state.confidence = button.dataset.confidence;
+  renderConfidenceFilters();
   render();
 });
 

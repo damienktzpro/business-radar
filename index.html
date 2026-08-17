@@ -3,52 +3,81 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#080808" />
-  <meta name="description" content="Radar personnel de veille entrepreneuriale avec sources directes sélectionnées et confirmation multi-source." />
+  <meta name="theme-color" content="#08090a" />
+  <meta name="description" content="Business Radar — veille entrepreneuriale personnelle, sources sélectionnées, liens contrôlés et confirmation multi-source." />
   <title>Business Radar</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
   <header class="topbar">
-    <div>
-      <p class="eyebrow">VEILLE ENTREPRENEURIALE · V2.2</p>
+    <div class="brand-block">
+      <div class="brand-line">
+        <span class="brand-dot"></span>
+        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.3</p>
+      </div>
       <h1>Business Radar</h1>
+      <p class="tagline">Ce qui se crée, se finance et accélère — sans te faire cliquer n’importe où.</p>
       <p id="updated" class="updated">Chargement…</p>
     </div>
-    <button id="refresh" class="refresh" type="button" aria-label="Recharger les données affichées" title="Recharger">↻</button>
+    <button id="refresh" class="refresh" type="button" aria-label="Recharger les données affichées" title="Recharger le radar">
+      <span aria-hidden="true">↻</span>
+    </button>
   </header>
 
   <main>
-    <nav id="tabs" class="tabs" aria-label="Vues du radar">
-      <button class="tab active" data-view="Pour toi">Pour toi</button>
-      <button class="tab" data-view="France">France</button>
-      <button class="tab" data-view="Nouveaux business">Nouveaux business</button>
-      <button class="tab" data-view="Levées & M&A">Levées &amp; M&amp;A</button>
-      <button class="tab" data-view="Europe">Europe</button>
-      <button class="tab" data-view="Découverte">Découverte</button>
-      <button class="tab" data-view="Favoris">Favoris</button>
-    </nav>
-
-    <section class="controls">
-      <div>
-        <p class="control-label">Secteurs</p>
-        <div id="filters" class="filters"></div>
-      </div>
-      <label class="search-wrap">
-        <span>Rechercher</span>
-        <input id="search" type="search" placeholder="SaaS, IA, fintech…" autocomplete="off" />
+    <section class="commandbar" aria-label="Navigation et recherche">
+      <nav id="tabs" class="tabs" aria-label="Vues du radar">
+        <button class="tab active" data-view="Pour toi">Pour toi</button>
+        <button class="tab" data-view="France">France</button>
+        <button class="tab" data-view="Nouveaux business">Nouveaux business</button>
+        <button class="tab" data-view="Levées & M&A">Levées &amp; M&amp;A</button>
+        <button class="tab" data-view="Europe">Europe</button>
+        <button class="tab" data-view="Découverte">Découverte</button>
+        <button class="tab" data-view="Favoris">Favoris</button>
+      </nav>
+      <label class="search-wrap compact-search">
+        <span class="sr-only">Rechercher</span>
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="search" type="search" placeholder="Rechercher une entreprise, un secteur…" autocomplete="off" />
       </label>
     </section>
 
-    <section class="hero">
-      <div class="hero-status">
-        <span class="live-dot"></span>
-        <span>RADAR ACTIF · SOURCES DIRECTES</span>
+    <section class="snapshot" aria-label="État du radar">
+      <div class="snapshot-copy">
+        <span class="live-pill"><span class="live-dot"></span>RADAR ACTIF</span>
+        <h2 id="brief-title">Brief du moment</h2>
+        <p id="brief-text">Analyse des signaux et de leur niveau de confirmation…</p>
       </div>
-      <strong id="counter">0 signal</strong>
+      <div id="stats" class="stats" aria-label="Statistiques du radar"></div>
     </section>
 
-    <section id="stats" class="stats" aria-label="Statistiques du radar"></section>
+    <section class="controls-panel">
+      <div class="control-group">
+        <p class="control-label">Secteurs</p>
+        <div id="filters" class="filters"></div>
+      </div>
+      <div class="control-group confidence-control">
+        <p class="control-label">Fiabilité</p>
+        <div id="confidence-filters" class="filters reliability-filters">
+          <button class="filter active" data-confidence="Fiables">Fiables</button>
+          <button class="filter" data-confidence="Confirmés">Confirmés</button>
+          <button class="filter" data-confidence="Officiels">Officiels</button>
+          <button class="filter" data-confidence="Source unique">Source unique</button>
+          <button class="filter" data-confidence="À vérifier">À vérifier</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="results-head">
+      <div>
+        <p class="results-kicker">SIGNALS TRIÉS PAR PERTINENCE</p>
+        <strong id="counter">0 signal</strong>
+      </div>
+      <p class="safety-note"><span aria-hidden="true">✓</span> Liens directs contrôlés avant affichage</p>
+    </section>
 
     <section id="feed" class="feed" aria-live="polite"></section>
     <p id="empty" class="empty" hidden>Aucun résultat avec ces filtres.</p>
@@ -56,12 +85,20 @@
 
   <template id="card-template">
     <article class="card">
+      <div class="card-accent"></div>
       <div class="card-top">
         <div class="source-line">
-          <span class="source"></span>
-          <span class="trust"></span>
-          <span class="confidence"></span>
-          <span class="age"></span>
+          <span class="source-mark" aria-hidden="true"></span>
+          <div class="source-meta">
+            <div class="source-name-row">
+              <span class="source"></span>
+              <span class="age"></span>
+            </div>
+            <div class="trust-row">
+              <span class="trust"></span>
+              <span class="confidence"></span>
+            </div>
+          </div>
         </div>
         <div class="score-wrap">
           <span class="interest"></span>
@@ -69,23 +106,31 @@
         </div>
       </div>
 
-      <h2></h2>
+      <h3></h3>
       <div class="tags"></div>
 
-      <div class="insight-block">
-        <span class="insight-label">RÉSUMÉ EN FRANÇAIS</span>
-        <p class="summary"></p>
+      <div class="insight-grid">
+        <div class="insight-block summary-block">
+          <span class="insight-label">EN BREF</span>
+          <p class="summary"></p>
+        </div>
+        <div class="insight-block why-block">
+          <span class="insight-label">POURQUOI ÇA COMPTE</span>
+          <p class="why-text"></p>
+        </div>
       </div>
 
-      <div class="why-block">
-        <span class="insight-label">POURQUOI C’EST INTÉRESSANT</span>
-        <p class="why-text"></p>
+      <div class="verification-box">
+        <div class="verification-icon" aria-hidden="true">✓</div>
+        <div>
+          <strong class="verification-title"></strong>
+          <p class="confidence-note"></p>
+          <div class="confirmation-links"></div>
+        </div>
       </div>
-
-      <div class="confidence-note"></div>
 
       <details class="score-details">
-        <summary>Pourquoi ce score ?</summary>
+        <summary>Comprendre le score</summary>
         <div class="score-reasons"></div>
       </details>
 
@@ -96,15 +141,16 @@
 
       <div class="metrics"></div>
 
-      <div class="card-actions" aria-label="Personnaliser le radar">
-        <button class="action favorite" type="button">☆ Favori</button>
-        <button class="action more" type="button">↑ Plus comme ça</button>
-        <button class="action less" type="button">↓ Moins comme ça</button>
+      <div class="card-footer">
+        <div class="card-actions" aria-label="Personnaliser le radar">
+          <button class="action favorite" type="button">☆ Favori</button>
+          <button class="action more" type="button">↑ Plus comme ça</button>
+          <button class="action less" type="button">↓ Moins comme ça</button>
+        </div>
+        <a class="read" target="_blank" rel="noopener noreferrer">
+          <span class="read-label">Voir la source</span><span class="read-arrow">↗</span>
+        </a>
       </div>
-
-      <a class="read" target="_blank" rel="noopener noreferrer">
-        <span class="read-label">Voir la source</span><span>↗</span>
-      </a>
     </article>
   </template>
 
