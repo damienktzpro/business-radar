@@ -643,7 +643,7 @@ h3 { margin: 14px 0 8px; font-size: clamp(18px, 2.2vw, 22px); line-height: 1.12;
 
 
 /* ──────────────────────────────────────────────────────────────
-   V2.5 — denser dashboard, Top 3 brief, better filter overflow
+   V2.6 — entrepreneurship-first ranking, diverse clickable Top 3
    ────────────────────────────────────────────────────────────── */
 :root { --max: 1180px; }
 
@@ -666,13 +666,37 @@ h3 { margin: 14px 0 8px; font-size: clamp(18px, 2.2vw, 22px); line-height: 1.12;
 }
 .daily-top-item {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
   gap: 8px;
   align-items: start;
+  width: 100%;
   padding: 7px 8px;
   border: 1px solid var(--line-soft);
   border-radius: 10px;
   background: color-mix(in srgb, var(--panel-3) 83%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.daily-top-item:hover {
+  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--accent-soft) 34%, var(--panel-3));
+  transform: translateY(-1px);
+}
+.daily-jump {
+  align-self: center;
+  justify-self: end;
+  color: var(--accent);
+  font-size: 12px;
+  opacity: .75;
+}
+.card.pulse-card {
+  animation: radar-pulse 1.15s ease;
+}
+@keyframes radar-pulse {
+  0%, 100% { box-shadow: 0 10px 35px rgba(0,0,0,.12); }
+  35% { box-shadow: 0 0 0 2px var(--accent), 0 18px 55px var(--accent-soft); }
 }
 .daily-rank {
   display: grid;

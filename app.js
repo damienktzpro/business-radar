@@ -5,8 +5,8 @@ const state = {
   confidence: "Fiables",
   query: "",
   stats: {},
-  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV25") || localStorage.getItem("businessRadarFavoritesV24") || localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
-  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV25") || localStorage.getItem("businessRadarPreferencesV24") || localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
+  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV26") || localStorage.getItem("businessRadarFavoritesV25") || localStorage.getItem("businessRadarFavoritesV24") || localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
+  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV26") || localStorage.getItem("businessRadarPreferencesV25") || localStorage.getItem("businessRadarPreferencesV24") || localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
 };
 
 const SAFE_HOSTS = [
@@ -66,8 +66,8 @@ function isSafeBrowserLink(rawUrl) {
 }
 
 function savePersonalization() {
-  localStorage.setItem("businessRadarFavoritesV25", JSON.stringify([...state.favorites]));
-  localStorage.setItem("businessRadarPreferencesV25", JSON.stringify(state.preferences));
+  localStorage.setItem("businessRadarFavoritesV26", JSON.stringify([...state.favorites]));
+  localStorage.setItem("businessRadarPreferencesV26", JSON.stringify(state.preferences));
 }
 
 function personalizationTags(item) {
@@ -89,7 +89,7 @@ function updatePreference(item, delta) {
 function categories() {
   const counts = new Map();
   state.items.flatMap(i => i.categories || []).forEach(c => {
-    if (["Business", "France", "Europe", "Lancement", "Levée", "Acquisition"].includes(c)) return;
+    if (["Business", "France", "Europe", "Lancement", "Levée", "Acquisition", "Expansion", "Partenariat", "Croissance"].includes(c)) return;
     counts.set(c, (counts.get(c) || 0) + 1);
   });
   return ["Tout", ...[...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([c]) => c)];
@@ -125,7 +125,7 @@ function matchesView(item) {
   if (state.view === "Pour toi") return isVerified(item);
   if (state.view === "France") return isVerified(item) && item.region === "France";
   if (state.view === "Europe") return isVerified(item) && ["Europe", "France"].includes(item.region);
-  if (state.view === "Nouveaux business") return isVerified(item) && item.event === "Lancement";
+  if (state.view === "Nouveaux business") return isVerified(item) && ["Lancement", "Expansion", "Partenariat"].includes(item.event);
   if (state.view === "Levées & M&A") return isVerified(item) && ["Levée", "Acquisition"].includes(item.event);
   if (state.view === "Découverte") return item.trust === "discovery";
   return isVerified(item);
@@ -141,6 +141,45 @@ function matchesConfidence(item) {
   return true;
 }
 
+function rankingScore(item) {
+  return (item.entrepreneurship_priority ?? item.score ?? 0) + personalBoost(item);
+}
+
+function dailyPriority(item) {
+  let value = rankingScore(item);
+  const level = item.confidence_level || "selected";
+  if (level === "official_confirmed") value += 18;
+  else if (level === "confirmed") value += 13;
+  else if (level === "official") value += 10;
+  if (item.region === "France") value += 6;
+  else if (item.region === "Europe") value += 3;
+  if (["Levée", "Acquisition", "Expansion", "Croissance", "Partenariat"].includes(item.event)) value += 7;
+  return value;
+}
+
+function pickDailyTop(items, limit = 3) {
+  const ordered = [...items]
+    .filter(item => item.confidence_level !== "conflict")
+    .sort((a, b) => dailyPriority(b) - dailyPriority(a));
+
+  // First pass: no publisher can monopolise the brief.
+  const chosen = [];
+  const usedSources = new Set();
+  for (const item of ordered) {
+    if (usedSources.has(item.source)) continue;
+    chosen.push(item);
+    usedSources.add(item.source);
+    if (chosen.length === limit) return chosen;
+  }
+  // Fallback only when there are too few distinct sources.
+  for (const item of ordered) {
+    if (chosen.some(x => x.id === item.id)) continue;
+    chosen.push(item);
+    if (chosen.length === limit) break;
+  }
+  return chosen;
+}
+
 function visibleItems() {
   const q = state.query.trim().toLowerCase();
   return state.items
@@ -149,7 +188,7 @@ function visibleItems() {
       const haystack = `${item.title} ${item.summary || ""} ${item.why || ""} ${(item.categories || []).join(" ")} ${item.source} ${item.region || ""} ${(item.confirmation_sources || []).join(" ")}`.toLowerCase();
       return matchesView(item) && matchesConfidence(item) && catOk && (!q || haystack.includes(q));
     })
-    .sort((a, b) => ((b.score || 0) + personalBoost(b)) - ((a.score || 0) + personalBoost(a)));
+    .sort((a, b) => rankingScore(b) - rankingScore(a));
 }
 
 function renderTabs() {
@@ -195,25 +234,41 @@ function renderDailyBrief() {
   briefText.textContent = `${base.length} signal${base.length > 1 ? "aux" : ""} fiable${base.length > 1 ? "s" : ""} ${windowLabel}` +
     (sector ? ` · ${sector[0]} est le secteur le plus présent.` : ".");
 
-  // Top 3: privilégie les signaux recoupés / officiels, puis le score.
-  const top = [...base]
-    .filter(item => item.confidence_level !== "conflict")
-    .sort((a, b) => {
-      const trustA = ["official_confirmed", "official"].includes(a.confidence_level) ? 30 : a.confidence_level === "confirmed" ? 20 : 0;
-      const trustB = ["official_confirmed", "official"].includes(b.confidence_level) ? 30 : b.confidence_level === "confirmed" ? 20 : 0;
-      return ((b.score || 0) + trustB) - ((a.score || 0) + trustA);
-    })
-    .slice(0, 3);
+  // Top 3 V2.6: valeur entrepreneuriale + fiabilité + diversité des éditeurs.
+  const top = pickDailyTop(base, 3);
 
   dailyTop.innerHTML = top.map((item, index) => `
-    <div class="daily-top-item">
+    <button type="button" class="daily-top-item" data-jump-id="${escapeAttr(item.id)}" title="Voir ce signal dans le radar">
       <span class="daily-rank">${index + 1}</span>
       <div>
         <strong>${escapeHtml(item.title)}</strong>
         <small>${escapeHtml(item.source)} · ${escapeHtml(item.confidence_label || "Source sélectionnée")}</small>
       </div>
-    </div>
+      <span class="daily-jump" aria-hidden="true">↓</span>
+    </button>
   `).join("");
+
+  dailyTop.querySelectorAll("[data-jump-id]").forEach(button => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.jumpId;
+      const target = [...feed.querySelectorAll(".card")].find(card => card.dataset.itemId === id);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.add("pulse-card");
+        setTimeout(() => target.classList.remove("pulse-card"), 1200);
+      } else {
+        // The card may be hidden by the current view/filter: return to the trusted feed and render it.
+        state.view = "Pour toi";
+        state.category = "Tout";
+        state.confidence = "Fiables";
+        renderTabs(); renderFilters(); renderConfidenceFilters(); render();
+        requestAnimationFrame(() => {
+          const retry = [...feed.querySelectorAll(".card")].find(card => card.dataset.itemId === id);
+          if (retry) retry.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+    });
+  });
 
   const chips = [
     raises ? [raises, "levée" + (raises > 1 ? "s" : "")] : null,
@@ -289,6 +344,7 @@ function render() {
   items.forEach((item, index) => {
     const node = template.content.cloneNode(true);
     const article = node.querySelector(".card");
+    article.dataset.itemId = item.id;
     if (index === 0) article.classList.add("featured");
     article.dataset.confidence = confidenceClass(item.confidence_level);
     article.classList.toggle("is-confirmed", ["confirmed", "official_confirmed"].includes(item.confidence_level));
