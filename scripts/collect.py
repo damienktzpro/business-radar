@@ -19,10 +19,10 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.2 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.3 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
-# V2.2: direct publisher feeds only. No Google News redirector and no arbitrary
+# V2.3: direct publisher feeds only. No Google News redirector and no arbitrary
 # founder website links in the trusted feed.
 RSS_SOURCES = [
     {
@@ -64,11 +64,11 @@ RSS_SOURCES = [
     {
         "name": "Sifted",
         "url": "https://sifted.eu/feed",
-        "weight": 19,
+        "weight": 21,
         "region": "Europe",
         "max": 28,
-        "trust": "editorial",
-        "trust_label": "Média sélectionné",
+        "trust": "reference",
+        "trust_label": "Média de référence",
         "source_type": "media",
         "safe_domains": ["sifted.eu"],
         "display_domain": "sifted.eu",
@@ -88,11 +88,11 @@ RSS_SOURCES = [
     {
         "name": "TechCrunch",
         "url": "https://techcrunch.com/feed/",
-        "weight": 18,
+        "weight": 20,
         "region": "International",
         "max": 30,
-        "trust": "editorial",
-        "trust_label": "Média sélectionné",
+        "trust": "reference",
+        "trust_label": "Média de référence",
         "source_type": "media",
         "safe_domains": ["techcrunch.com"],
         "display_domain": "techcrunch.com",
@@ -126,7 +126,7 @@ HN_ENDPOINTS = [
     }
 ]
 
-TRUST_RANK = {"official": 3, "editorial": 2, "discovery": 1}
+TRUST_RANK = {"official": 4, "reference": 3, "editorial": 2, "discovery": 1}
 
 EVENT_PATTERNS = {
     "Levée": [
@@ -178,6 +178,7 @@ STOPWORDS = {
     "announces", "annonce", "lance", "levee", "levée", "million", "millions", "billion", "series", "seed", "new", "nouveau",
 }
 METRICS = {"links_checked": 0, "links_blocked": 0}
+SOURCE_HEALTH = {"expected": len(RSS_SOURCES) + len(HN_ENDPOINTS), "success": 0, "failed": [], "empty": []}
 
 
 def http_get(url: str, timeout: int = 25) -> bytes:
@@ -303,7 +304,7 @@ def business_relevance(title: str, summary: str, source: str, event: str) -> int
     t = f"{title} {summary} {source}".lower()
     score = sum(2 for term in BUSINESS_TERMS if term in t)
     if event != "Business": score += 5
-    if source in {"Product Hunt", "Show HN", "EU-Startups", "Maddyness", "FrenchWeb", "Sifted"}: score += 4
+    if source in {"Product Hunt", "Show HN", "EU-Startups", "Maddyness", "FrenchWeb", "Sifted", "TechCrunch"}: score += 4
     return score
 
 
@@ -391,9 +392,11 @@ def why_interesting(event: str, sectors: list[str], region: str) -> str:
 def score_item(source_weight: int, trust: str, event: str, sectors: list[str], region: str, published_at: str, points: int = 0, comments: int = 0) -> tuple[int, list[str]]:
     score = 34 + source_weight
     reasons = [f"Source pondérée +{source_weight}"]
-    trust_bonus = {"official": 10, "editorial": 6, "discovery": 0}.get(trust, 0)
+    trust_bonus = {"official": 12, "reference": 8, "editorial": 5, "discovery": 0}.get(trust, 0)
     score += trust_bonus
-    if trust_bonus: reasons.append(("Source officielle" if trust == "official" else "Média sélectionné") + f" +{trust_bonus}")
+    if trust_bonus:
+        trust_name = {"official": "Source officielle", "reference": "Média de référence", "editorial": "Média spécialisé"}.get(trust, "Source")
+        reasons.append(trust_name + f" +{trust_bonus}")
 
     for tag in [event, region, *sectors]:
         bonus = PERSONAL_BOOSTS.get(tag, 0)
@@ -418,7 +421,7 @@ def score_item(source_weight: int, trust: str, event: str, sectors: list[str], r
         bonus = min(comments // 20, 6); score += bonus
         if bonus: reasons.append(f"Discussion active +{bonus}")
 
-    return max(1, min(score, 99)), reasons[:6]
+    return max(1, min(score, 99)), reasons[:7]
 
 
 def interest_label(score: int) -> str:
@@ -444,6 +447,9 @@ def make_item(*, title: str, summary: str, url: str, source: str, published_at: 
     source_summary = short_text(summary, 320)
     if not title or not url:
         return None
+    # Business Radar is a current-awareness tool: ignore stale feed entries.
+    if age_hours(published_at) > 24 * 21:
+        return None
     METRICS["links_checked"] += 1
     if not is_safe_url(url, safe_domains):
         METRICS["links_blocked"] += 1
@@ -462,6 +468,7 @@ def make_item(*, title: str, summary: str, url: str, source: str, published_at: 
     return {
         "id": item_id(url, title),
         "title": title,
+        "entity": extract_subject(title),
         "summary": french_digest(title, source_summary, event, source, sectors, region),
         "source_excerpt": source_summary if source_summary and source_summary != french_digest(title, source_summary, event, source, sectors, region) else "",
         "why": why_interesting(event, sectors, region),
@@ -547,38 +554,116 @@ def normalized_tokens(title: str) -> set[str]:
 
 
 def normalized_amounts(text: str) -> set[str]:
-    vals = re.findall(r"(?:[$€£]\s?\d+(?:[.,]\d+)?\s?(?:[kmb]|bn)?|\d+(?:[.,]\d+)?\s?(?:million|millions|milliard|milliards))", text.lower())
+    vals = re.findall(r"(?:[$€£]\s?\d+(?:[.,]\d+)?\s?(?:[kmb]|bn|million|billion)?|\d+(?:[.,]\d+)?\s?(?:million|millions|milliard|milliards))", text.lower())
     return {re.sub(r"\s+", "", v) for v in vals}
+
+
+def normalize_entity(value: str) -> str:
+    value = re.sub(r"^show hn:\s*", "", clean_text(value), flags=re.I).lower()
+    value = re.sub(r"[^a-zà-ÿ0-9+.-]+", " ", value)
+    words = [w.strip(".-") for w in value.split() if w.strip(".-") and w.strip(".-") not in STOPWORDS]
+    return " ".join(words[:5])
+
+
+def entity_tokens(item: dict) -> set[str]:
+    subject = item.get("entity") or extract_subject(item.get("title", ""))
+    return normalized_tokens(normalize_entity(subject))
+
+
+def published_distance_hours(a: dict, b: dict) -> float:
+    try:
+        da = datetime.fromisoformat(a["published_at"].replace("Z", "+00:00"))
+        db = datetime.fromisoformat(b["published_at"].replace("Z", "+00:00"))
+        if da.tzinfo is None: da = da.replace(tzinfo=timezone.utc)
+        if db.tzinfo is None: db = db.replace(tzinfo=timezone.utc)
+        return abs((da - db).total_seconds()) / 3600
+    except Exception:
+        return 9999
+
+
+def normalize_event_amount(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    t = clean_text(raw).lower().replace(" ", "").replace(",", ".")
+    t = t.replace("million", "m").replace("millions", "m").replace("billion", "b").replace("milliard", "b").replace("milliards", "b").replace("bn", "b")
+    return t
+
+
+def event_amount(text: str, event: str) -> str | None:
+    if event != "Levée":
+        return None
+    amount = r"([$€£]\s?\d+(?:[.,]\d+)?\s?(?:[kmb]|bn|million|millions|billion)?|\d+(?:[.,]\d+)?\s?(?:million|millions|milliard|milliards)\s?(?:d['’]euros|euros|€|dollars?)?)"
+    patterns = [
+        rf"(?:raises?|raised|secures?|secured|closes?|closed|funding(?: round)? of)\s+(?:about\s+|over\s+|up to\s+)?{amount}",
+        rf"(?:l[èe]ve|levée de|tour de table de|financement de)\s+(?:plus de\s+|environ\s+)?{amount}",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, flags=re.I)
+        if m:
+            return normalize_event_amount(m.group(1))
+    return None
 
 
 def same_signal(a: dict, b: dict) -> bool:
     if a["source"] == b["source"]:
         return False
+    if published_distance_hours(a, b) > (24 * 7 if a.get("event") == "Levée" else 24 * 4):
+        return False
     if a["event"] != b["event"] and "Business" not in {a["event"], b["event"]}:
         return False
+
     ta, tb = normalized_tokens(a["title"]), normalized_tokens(b["title"])
-    if not ta or not tb: return False
+    ea, eb = entity_tokens(a), entity_tokens(b)
+    if not ta or not tb:
+        return False
     inter = ta & tb
     union = ta | tb
     jaccard = len(inter) / max(1, len(union))
     seq = SequenceMatcher(None, re.sub(r"\W+", " ", a["title"].lower()), re.sub(r"\W+", " ", b["title"].lower())).ratio()
-    amounts_a, amounts_b = normalized_amounts(a["title"]), normalized_amounts(b["title"])
-    same_amount = bool(amounts_a & amounts_b)
-    distinctive = any(len(tok) >= 6 for tok in inter)
-    return jaccard >= 0.42 or seq >= 0.70 or (same_amount and distinctive and len(inter) >= 1)
+    shared_entity = ea & eb
+    amount_a = event_amount(f"{a['title']} {a.get('source_excerpt','')}", a.get("event", "Business"))
+    amount_b = event_amount(f"{b['title']} {b.get('source_excerpt','')}", b.get("event", "Business"))
+    same_amount = bool(amount_a and amount_b and amount_a == amount_b)
+    distinctive = any(len(tok) >= 5 for tok in inter)
+
+    # Deliberately conservative: confirmation is only created when the same
+    # company/entity is recognizable, or when title similarity is very high.
+    if shared_entity and (jaccard >= 0.26 or same_amount or (distinctive and len(inter) >= 2)):
+        return True
+    if seq >= 0.76 and distinctive and len(inter) >= 2:
+        return True
+    if same_amount and distinctive and len(inter) >= 2:
+        return True
+    return False
 
 
-def confidence_for(cluster: list[dict], primary: dict) -> tuple[str, str, str]:
-    trusted_sources = list(dict.fromkeys(i["source"] for i in cluster if i["trust"] in {"official", "editorial"}))
-    has_official = any(i["trust"] == "official" for i in cluster)
+def detect_cluster_conflict(cluster: list[dict]) -> tuple[bool, str]:
+    funding_amounts = {
+        amount for item in cluster
+        if (amount := event_amount(f"{item.get('title','')} {item.get('source_excerpt','')}", item.get("event", "Business")))
+    }
+    if len(funding_amounts) > 1:
+        return True, "Les sources rapprochées ne donnent pas le même montant de financement. Le radar conserve le signal mais le marque à vérifier."
+    return False, ""
+
+
+def confidence_for(cluster: list[dict], primary: dict, conflict: bool = False) -> tuple[str, str, str]:
+    trusted = [i for i in cluster if i["trust"] in {"official", "reference", "editorial"}]
+    trusted_sources = list(dict.fromkeys(i["source"] for i in trusted))
+    has_official = any(i["trust"] == "official" for i in trusted)
+
+    if conflict:
+        return "conflict", "À vérifier · sources divergentes", "Plusieurs sources ont été rapprochées, mais au moins un chiffre clé diffère."
+    if has_official and len(trusted_sources) >= 2:
+        return "official_confirmed", f"Confirmé · officiel + {len(trusted_sources)-1} média{'s' if len(trusted_sources)-1 > 1 else ''}", "Une source officielle et au moins un média indépendant convergent sur ce signal."
     if has_official:
-        label = "Source officielle" if len(trusted_sources) == 1 else f"Confirmé · {len(trusted_sources)} sources"
-        note = "Une source officielle figure dans les confirmations." if len(trusted_sources) > 1 else "Information publiée directement par une source officielle autorisée."
-        return "official", label, note
-    if len(trusted_sources) >= 2:
-        return "confirmed", f"Confirmé · {len(trusted_sources)} sources", "Le même signal a été retrouvé dans plusieurs médias sélectionnés distincts."
-    if primary["trust"] == "editorial":
-        return "selected", "Source unique sélectionnée", "Le lien provient d’un média autorisé, mais le radar n’a pas trouvé de seconde confirmation indépendante."
+        return "official", "Source officielle", "Information publiée directement par une source officielle autorisée."
+    if len(trusted_sources) >= 3:
+        return "confirmed", f"Très bien confirmé · {len(trusted_sources)} sources", "Le même signal a été retrouvé dans au moins trois médias sélectionnés distincts."
+    if len(trusted_sources) == 2:
+        return "confirmed", "Confirmé · 2 sources", "Deux médias sélectionnés distincts convergent sur le même signal."
+    if primary["trust"] in {"reference", "editorial"}:
+        return "selected", "Source unique sélectionnée", "Le lien provient d’un média autorisé, mais aucune seconde confirmation indépendante n’a été rapprochée pour l’instant."
     return "discovery", "Découverte · non confirmée", "Signal de découverte : utile pour repérer tôt un projet, mais ce n’est pas une validation éditoriale."
 
 
@@ -588,12 +673,17 @@ def cluster_and_dedupe(items: Iterable[dict]) -> list[dict]:
     exact_urls = set()
     for item in ordered:
         url_key = re.sub(r"[?#].*$", "", item["url"])
-        if url_key in exact_urls: continue
+        if url_key in exact_urls:
+            continue
         exact_urls.add(url_key)
         placed = False
         for cluster in clusters:
-            if same_signal(item, cluster[0]):
-                cluster.append(item); placed = True; break
+            # Compare with up to the three strongest items in a cluster, not
+            # only the first one, to reduce false negatives across languages.
+            if any(same_signal(item, peer) for peer in cluster[:3]):
+                cluster.append(item)
+                placed = True
+                break
         if not placed:
             clusters.append([item])
 
@@ -601,28 +691,48 @@ def cluster_and_dedupe(items: Iterable[dict]) -> list[dict]:
     for cluster in clusters:
         primary = sorted(cluster, key=lambda x: (x.get("trust_rank", 0), x.get("score", 0), x.get("published_at", "")), reverse=True)[0].copy()
         sources = list(dict.fromkeys(i["source"] for i in cluster))
+        trusted_cluster = [i for i in cluster if i["trust"] in {"official", "reference", "editorial"}]
+        conflict, conflict_note = detect_cluster_conflict(trusted_cluster)
+
         primary["confirmation_count"] = len(sources)
         primary["confirmation_sources"] = sources
-        level, label, note = confidence_for(cluster, primary)
+        primary["confirmation_links"] = [
+            {
+                "source": i["source"],
+                "url": i["url"],
+                "domain": i["domain"],
+                "trust": i["trust"],
+            }
+            for i in sorted(cluster, key=lambda x: (x.get("trust_rank", 0), x.get("score", 0)), reverse=True)
+        ][:5]
+        level, label, note = confidence_for(cluster, primary, conflict)
         primary["confidence_level"] = level
         primary["confidence_label"] = label
-        primary["confidence_note"] = note
+        primary["confidence_note"] = conflict_note or note
+
         if level == "confirmed":
-            primary["score"] = min(99, primary["score"] + 8)
-            primary["score_reasons"] = ["Confirmation multi-source +8", *primary.get("score_reasons", [])][:6]
-        elif level == "official" and primary["trust"] != "official":
-            primary["score"] = min(99, primary["score"] + 6)
-            primary["score_reasons"] = ["Confirmation officielle +6", *primary.get("score_reasons", [])][:6]
+            primary["score"] = min(99, primary["score"] + 9)
+            primary["score_reasons"] = ["Confirmation multi-source +9", *primary.get("score_reasons", [])][:7]
+        elif level == "official_confirmed":
+            primary["score"] = min(99, primary["score"] + 11)
+            primary["score_reasons"] = ["Source officielle + recoupement +11", *primary.get("score_reasons", [])][:7]
+        elif level == "conflict":
+            primary["score"] = max(1, primary["score"] - 12)
+            primary["score_reasons"] = ["Divergence détectée −12", *primary.get("score_reasons", [])][:7]
+
         primary["interest"] = interest_label(primary["score"])
         out.append(primary)
-    return out[:MAX_ITEMS]
 
+    # Keep the feed focused: trusted sources first, then discovery; very old
+    # or weak generic business items naturally fall to the bottom.
+    out.sort(key=lambda x: (x.get("confidence_level") not in {"discovery", "conflict"}, x.get("score", 0), x.get("published_at", "")), reverse=True)
+    return out[:MAX_ITEMS]
 
 def build_demo() -> list[dict]:
     now = datetime.now(timezone.utc)
     demos = [
-        dict(title="Higgsfield raises $400M Series B, quadrupling its valuation", summary="Higgsfield, founded by a former Snap executive, lets users create AI images and videos.", url="https://techcrunch.com/demo-higgsfield", source="TechCrunch", published_at=now.isoformat(), source_weight=18, trust="editorial", trust_label="Média sélectionné", source_type="media", safe_domains=["techcrunch.com"], display_domain="techcrunch.com", default_event="Levée"),
-        dict(title="Higgsfield secures $400M in Series B funding", summary="The AI video startup has raised a new funding round.", url="https://sifted.eu/articles/demo-higgsfield", source="Sifted", published_at=(now-timedelta(minutes=20)).isoformat(), source_weight=19, trust="editorial", trust_label="Média sélectionné", source_type="media", safe_domains=["sifted.eu"], display_domain="sifted.eu", default_region="Europe", default_event="Levée"),
+        dict(title="Higgsfield raises $400M Series B, quadrupling its valuation", summary="Higgsfield, founded by a former Snap executive, lets users create AI images and videos.", url="https://techcrunch.com/demo-higgsfield", source="TechCrunch", published_at=now.isoformat(), source_weight=20, trust="reference", trust_label="Média de référence", source_type="media", safe_domains=["techcrunch.com"], display_domain="techcrunch.com", default_event="Levée"),
+        dict(title="Higgsfield secures $400M in Series B funding", summary="The AI video startup has raised a new funding round.", url="https://sifted.eu/articles/demo-higgsfield", source="Sifted", published_at=(now-timedelta(minutes=20)).isoformat(), source_weight=21, trust="reference", trust_label="Média de référence", source_type="media", safe_domains=["sifted.eu"], display_domain="sifted.eu", default_region="Europe", default_event="Levée"),
         dict(title="Bpifrance annonce un programme d'accompagnement pour les startups deeptech", summary="Le programme renforce l'accompagnement des entreprises innovantes vers l'industrialisation.", url="https://presse.bpifrance.fr/demo", source="Bpifrance Presse", published_at=(now-timedelta(hours=2)).isoformat(), source_weight=22, trust="official", trust_label="Source officielle", source_type="official", safe_domains=["presse.bpifrance.fr"], display_domain="presse.bpifrance.fr", default_region="France"),
         dict(title="Show HN: AI agent that turns customer calls into CRM actions", summary="", url="https://news.ycombinator.com/item?id=123456", source="Show HN", published_at=(now-timedelta(hours=1)).isoformat(), source_weight=12, trust="discovery", trust_label="Découverte · non confirmée", source_type="community", safe_domains=["news.ycombinator.com"], display_domain="news.ycombinator.com", default_event="Lancement", points=98, comments=42),
     ]
@@ -632,14 +742,18 @@ def build_demo() -> list[dict]:
 def stats_for(items: list[dict]) -> dict:
     return {
         "sources": len({i.get("source") for i in items}),
+        "sources_active": SOURCE_HEALTH["success"],
+        "sources_expected": SOURCE_HEALTH["expected"],
+        "sources_failed": len(SOURCE_HEALTH["failed"]),
+        "source_failures": SOURCE_HEALTH["failed"],
         "france": sum(1 for i in items if i.get("region") == "France"),
-        "verified": sum(1 for i in items if i.get("trust") in {"official", "editorial"}),
-        "confirmed": sum(1 for i in items if i.get("confidence_level") in {"confirmed", "official"} and i.get("confirmation_count", 1) >= 2),
-        "official": sum(1 for i in items if i.get("confidence_level") == "official"),
+        "verified": sum(1 for i in items if i.get("trust") in {"official", "reference", "editorial"}),
+        "confirmed": sum(1 for i in items if i.get("confidence_level") in {"confirmed", "official_confirmed"}),
+        "official": sum(1 for i in items if i.get("confidence_level") in {"official", "official_confirmed"}),
+        "conflicts": sum(1 for i in items if i.get("confidence_level") == "conflict"),
         "links_checked": METRICS["links_checked"],
         "links_blocked": METRICS["links_blocked"],
     }
-
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -649,22 +763,36 @@ def main() -> int:
     errors: list[str] = []
 
     if args.demo:
+        SOURCE_HEALTH["expected"] = 4
+        SOURCE_HEALTH["success"] = 4
         items = build_demo()
     else:
         for source in RSS_SOURCES:
             try:
-                items.extend(fetch_rss(source))
+                fetched = fetch_rss(source)
+                items.extend(fetched)
+                SOURCE_HEALTH["success"] += 1
+                if not fetched:
+                    SOURCE_HEALTH["empty"].append(source["name"])
             except Exception as exc:
-                errors.append(f"{source['name']}: {exc}")
+                message = f"{source['name']}: {exc}"
+                errors.append(message)
+                SOURCE_HEALTH["failed"].append(source["name"])
         for spec in HN_ENDPOINTS:
             try:
-                items.extend(fetch_hn(spec))
+                fetched = fetch_hn(spec)
+                items.extend(fetched)
+                SOURCE_HEALTH["success"] += 1
+                if not fetched:
+                    SOURCE_HEALTH["empty"].append(spec["name"])
             except Exception as exc:
-                errors.append(f"{spec['name']}: {exc}")
+                message = f"{spec['name']}: {exc}"
+                errors.append(message)
+                SOURCE_HEALTH["failed"].append(spec["name"])
         items = cluster_and_dedupe(items)
 
     payload = {
-        "version": "2.2",
+        "version": "2.3",
         "strict_link_mode": True,
         "direct_sources_only": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
