@@ -6,6 +6,22 @@ const state = {
   stats: {},
 };
 
+// Defence in depth: even if feed.json were modified, the browser refuses to
+// open a link outside this explicit allowlist.
+const SAFE_HOSTS = [
+  "producthunt.com",
+  "techcrunch.com",
+  "eu-startups.com",
+  "maddyness.com",
+  "frenchweb.fr",
+  "bpifrance.fr",
+  "lafrenchtech.com",
+  "sifted.eu",
+  "news.ycombinator.com",
+  "news.google.com",
+];
+const BLOCKED_EXTENSIONS = [".exe", ".msi", ".dmg", ".pkg", ".apk", ".zip", ".rar", ".7z", ".iso"];
+
 const feed = document.querySelector("#feed");
 const empty = document.querySelector("#empty");
 const counter = document.querySelector("#counter");
@@ -22,6 +38,26 @@ function timeAgo(iso) {
   if (seconds < 3600) return `il y a ${Math.floor(seconds / 60)} min`;
   if (seconds < 86400) return `il y a ${Math.floor(seconds / 3600)} h`;
   return `il y a ${Math.floor(seconds / 86400)} j`;
+}
+
+function hostnameAllowed(hostname) {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  return SAFE_HOSTS.some(allowed => host === allowed || host.endsWith(`.${allowed}`));
+}
+
+function isSafeBrowserLink(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "https:") return false;
+    if (url.username || url.password) return false;
+    if (!url.hostname || url.hostname.includes("xn--")) return false;
+    if (!hostnameAllowed(url.hostname)) return false;
+    const path = url.pathname.toLowerCase();
+    if (BLOCKED_EXTENSIONS.some(ext => path.endsWith(ext))) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function categories() {
@@ -48,13 +84,18 @@ function renderFilters() {
   });
 }
 
+function isVerified(item) {
+  return ["official", "editorial"].includes(item.trust);
+}
+
 function matchesView(item) {
-  if (state.view === "Pour toi") return true;
-  if (state.view === "France") return item.region === "France";
-  if (state.view === "Europe") return item.region === "Europe" || item.region === "France";
-  if (state.view === "Nouveaux business") return item.event === "Lancement" || ["Product Hunt", "Show HN"].includes(item.source);
-  if (state.view === "Levées & M&A") return ["Levée", "Acquisition"].includes(item.event);
-  return true;
+  if (state.view === "Pour toi") return isVerified(item);
+  if (state.view === "France") return isVerified(item) && item.region === "France";
+  if (state.view === "Europe") return isVerified(item) && (item.region === "Europe" || item.region === "France");
+  if (state.view === "Nouveaux business") return isVerified(item) && item.event === "Lancement";
+  if (state.view === "Levées & M&A") return isVerified(item) && ["Levée", "Acquisition"].includes(item.event);
+  if (state.view === "Découverte") return item.trust === "discovery";
+  return isVerified(item);
 }
 
 function visibleItems() {
@@ -78,10 +119,10 @@ function renderTabs() {
 function renderStats() {
   const s = state.stats || {};
   stats.innerHTML = [
-    s.sources ? `<span><strong>${s.sources}</strong> sources</span>` : "",
+    s.sources ? `<span><strong>${s.sources}</strong> sources sélectionnées</span>` : "",
+    s.verified ? `<span><strong>${s.verified}</strong> signaux vérifiés</span>` : "",
     s.france ? `<span><strong>${s.france}</strong> signaux France</span>` : "",
-    s.launches ? `<span><strong>${s.launches}</strong> lancements</span>` : "",
-    s.funding_ma ? `<span><strong>${s.funding_ma}</strong> levées / M&A</span>` : "",
+    s.safe_links ? `<span><strong>${s.safe_links}/${state.items.length}</strong> liens filtrés</span>` : "",
   ].filter(Boolean).join("");
 }
 
@@ -102,6 +143,13 @@ function render() {
     node.querySelector(".interest").textContent = item.interest || "À surveiller";
     node.querySelector("h2").textContent = item.title;
 
+    const trust = node.querySelector(".trust");
+    trust.textContent = item.trust_label || "Source filtrée";
+    trust.classList.add(`trust-${item.trust || "editorial"}`);
+    trust.title = item.trust === "discovery"
+      ? "Plateforme utile pour découvrir des projets, mais le contenu n’est pas une validation journalistique."
+      : "Source retenue dans la liste blanche du Business Radar.";
+
     const summary = node.querySelector(".summary");
     summary.textContent = item.summary || item.domain || "Ouvrir la source pour en savoir plus.";
 
@@ -118,12 +166,22 @@ function render() {
     const metricText = [
       m.points ? `${m.points} points` : "",
       m.comments ? `${m.comments} commentaires` : "",
-      item.domain && !item.domain.includes("news.google.com") ? item.domain : "",
+      item.domain || "",
     ].filter(Boolean).join(" · ");
     node.querySelector(".metrics").textContent = metricText;
 
     const link = node.querySelector(".read");
-    link.href = item.url;
+    const safe = item.safe_link === true && isSafeBrowserLink(item.url);
+    if (safe) {
+      link.href = item.url;
+      link.querySelector(".read-label").textContent = item.link_label || `Ouvrir ${item.source}`;
+      link.title = `Lien filtré : ${item.domain}`;
+    } else {
+      link.removeAttribute("href");
+      link.classList.add("blocked");
+      link.querySelector(".read-label").textContent = "Lien bloqué par sécurité";
+      link.title = "Ce lien ne correspond pas à la liste blanche du Business Radar.";
+    }
     feed.appendChild(node);
   });
 }
@@ -141,7 +199,7 @@ async function load() {
     const data = await response.json();
     state.items = data.items || [];
     state.stats = data.stats || {};
-    updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · automatique toutes les 6 h`;
+    updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · liens en mode strict · automatique toutes les 6 h`;
     renderStats();
     renderFilters();
     renderTabs();

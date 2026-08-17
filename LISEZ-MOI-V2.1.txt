@@ -1,0 +1,23 @@
+BUSINESS RADAR V2.1 — MODE LIENS STRICT
+
+À remplacer sur GitHub :
+- app.js
+- index.html
+- styles.css
+- scripts/collect.py
+
+Ce que change la V2.1 :
+- suppression des recherches Google News généralistes qui pouvaient faire remonter des sites aléatoires ;
+- liste blanche de sources : Bpifrance, La French Tech, Maddyness, FrenchWeb, TechCrunch, EU-Startups, Sifted, Product Hunt et Hacker News ;
+- les liens doivent être HTTPS et appartenir à une liste blanche de domaines ;
+- blocage des IP, domaines en punycode et liens directs vers des fichiers exécutables/archives ;
+- Show HN n'ouvre plus le site externe du projet : seulement la discussion news.ycombinator.com ;
+- Product Hunt reste sur producthunt.com ;
+- double contrôle : collecteur Python + navigateur JavaScript ;
+- badges Source officielle / Média vérifié / Communauté à vérifier ;
+- l'onglet Pour toi masque par défaut les sources de découverte non journalistiques ;
+- nouvel onglet Découverte pour Product Hunt / Show HN.
+
+Aucun système ne peut garantir la vérité de 100 % des informations publiées. Cette version vise deux objectifs distincts :
+1. ne pas t'envoyer vers des domaines web aléatoires ;
+2. distinguer les sources officielles/éditoriales des plateformes de découverte.
