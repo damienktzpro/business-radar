@@ -3,36 +3,50 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="theme-color" content="#080808" />
+  <meta name="description" content="Radar personnel des lancements, startups, levées et tendances entrepreneuriales." />
   <title>Business Radar</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">VEILLE ENTREPRENEURIALE</p>
+      <p class="eyebrow">VEILLE ENTREPRENEURIALE · V2</p>
       <h1>Business Radar</h1>
       <p id="updated" class="updated">Chargement…</p>
     </div>
-    <button id="refresh" class="refresh" type="button" aria-label="Actualiser">↻</button>
+    <button id="refresh" class="refresh" type="button" aria-label="Recharger les données affichées" title="Recharger">↻</button>
   </header>
 
   <main>
+    <nav id="tabs" class="tabs" aria-label="Vues du radar">
+      <button class="tab active" data-view="Pour toi">Pour toi</button>
+      <button class="tab" data-view="France">France</button>
+      <button class="tab" data-view="Nouveaux business">Nouveaux business</button>
+      <button class="tab" data-view="Levées & M&A">Levées & M&amp;A</button>
+      <button class="tab" data-view="Europe">Europe</button>
+    </nav>
+
     <section class="controls">
-      <div id="filters" class="filters"></div>
+      <div>
+        <p class="control-label">Secteurs</p>
+        <div id="filters" class="filters"></div>
+      </div>
       <label class="search-wrap">
         <span>Rechercher</span>
-        <input id="search" type="search" placeholder="SaaS, IA, fintech…" />
+        <input id="search" type="search" placeholder="SaaS, IA, fintech…" autocomplete="off" />
       </label>
     </section>
 
     <section class="hero">
-      <div>
+      <div class="hero-status">
         <span class="live-dot"></span>
         <span>RADAR ACTIF</span>
       </div>
       <strong id="counter">0 signaux</strong>
     </section>
+
+    <section id="stats" class="stats" aria-label="Statistiques du radar"></section>
 
     <section id="feed" class="feed" aria-live="polite"></section>
     <p id="empty" class="empty" hidden>Aucun résultat avec ces filtres.</p>
@@ -45,11 +59,25 @@
           <span class="source"></span>
           <span class="age"></span>
         </div>
-        <span class="score"></span>
+        <div class="score-wrap">
+          <span class="interest"></span>
+          <span class="score"></span>
+        </div>
       </div>
+
       <h2></h2>
-      <p class="summary"></p>
       <div class="tags"></div>
+
+      <div class="insight-block">
+        <span class="insight-label">CE QUI SE PASSE</span>
+        <p class="summary"></p>
+      </div>
+
+      <div class="why-block">
+        <span class="insight-label">POURQUOI C’EST INTÉRESSANT</span>
+        <p class="why-text"></p>
+      </div>
+
       <div class="metrics"></div>
       <a class="read" target="_blank" rel="noopener noreferrer">Voir la source <span>↗</span></a>
     </article>
