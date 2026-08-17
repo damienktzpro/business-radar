@@ -4,21 +4,22 @@ const state = {
   category: "Tout",
   query: "",
   stats: {},
+  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV22") || "[]")),
+  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV22") || "{}"),
 };
 
-// Defence in depth: even if feed.json were modified, the browser refuses to
-// open a link outside this explicit allowlist.
+// V2.2: every trusted link must point directly to an explicitly allowed domain.
+// No Google News redirector and no arbitrary founder website in the trusted feed.
 const SAFE_HOSTS = [
-  "producthunt.com",
-  "techcrunch.com",
-  "eu-startups.com",
+  "presse.bpifrance.fr",
+  "bpifrance.fr",
   "maddyness.com",
   "frenchweb.fr",
-  "bpifrance.fr",
-  "lafrenchtech.com",
   "sifted.eu",
+  "eu-startups.com",
+  "techcrunch.com",
+  "producthunt.com",
   "news.ycombinator.com",
-  "news.google.com",
 ];
 const BLOCKED_EXTENSIONS = [".exe", ".msi", ".dmg", ".pkg", ".apk", ".zip", ".rar", ".7z", ".iso"];
 
@@ -48,16 +49,33 @@ function hostnameAllowed(hostname) {
 function isSafeBrowserLink(rawUrl) {
   try {
     const url = new URL(rawUrl);
-    if (url.protocol !== "https:") return false;
-    if (url.username || url.password) return false;
-    if (!url.hostname || url.hostname.includes("xn--")) return false;
-    if (!hostnameAllowed(url.hostname)) return false;
-    const path = url.pathname.toLowerCase();
-    if (BLOCKED_EXTENSIONS.some(ext => path.endsWith(ext))) return false;
-    return true;
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    if (!url.hostname || url.hostname.includes("xn--") || !hostnameAllowed(url.hostname)) return false;
+    return !BLOCKED_EXTENSIONS.some(ext => url.pathname.toLowerCase().endsWith(ext));
   } catch {
     return false;
   }
+}
+
+function savePersonalization() {
+  localStorage.setItem("businessRadarFavoritesV22", JSON.stringify([...state.favorites]));
+  localStorage.setItem("businessRadarPreferencesV22", JSON.stringify(state.preferences));
+}
+
+function personalizationTags(item) {
+  return [...new Set([item.event, item.region, ...(item.sectors || [])].filter(Boolean))];
+}
+
+function personalBoost(item) {
+  return personalizationTags(item).reduce((sum, tag) => sum + (state.preferences[tag] || 0) * 3, 0);
+}
+
+function updatePreference(item, delta) {
+  personalizationTags(item).forEach(tag => {
+    state.preferences[tag] = Math.max(-3, Math.min(3, (state.preferences[tag] || 0) + delta));
+  });
+  savePersonalization();
+  render();
 }
 
 function categories() {
@@ -89,9 +107,10 @@ function isVerified(item) {
 }
 
 function matchesView(item) {
+  if (state.view === "Favoris") return state.favorites.has(item.id);
   if (state.view === "Pour toi") return isVerified(item);
   if (state.view === "France") return isVerified(item) && item.region === "France";
-  if (state.view === "Europe") return isVerified(item) && (item.region === "Europe" || item.region === "France");
+  if (state.view === "Europe") return isVerified(item) && ["Europe", "France"].includes(item.region);
   if (state.view === "Nouveaux business") return isVerified(item) && item.event === "Lancement";
   if (state.view === "Levées & M&A") return isVerified(item) && ["Levée", "Acquisition"].includes(item.event);
   if (state.view === "Découverte") return item.trust === "discovery";
@@ -102,12 +121,11 @@ function visibleItems() {
   const q = state.query.trim().toLowerCase();
   return state.items
     .filter(item => {
-      const viewOk = matchesView(item);
       const catOk = state.category === "Tout" || (item.categories || []).includes(state.category);
       const haystack = `${item.title} ${item.summary || ""} ${item.why || ""} ${(item.categories || []).join(" ")} ${item.source} ${item.region || ""}`.toLowerCase();
-      return viewOk && catOk && (!q || haystack.includes(q));
+      return matchesView(item) && catOk && (!q || haystack.includes(q));
     })
-    .sort((a, b) => (b.score || 0) - (a.score || 0));
+    .sort((a, b) => ((b.score || 0) + personalBoost(b)) - ((a.score || 0) + personalBoost(a)));
 }
 
 function renderTabs() {
@@ -118,12 +136,18 @@ function renderTabs() {
 
 function renderStats() {
   const s = state.stats || {};
+  const checked = Number(s.links_checked || 0);
+  const blocked = Number(s.links_blocked || 0);
   stats.innerHTML = [
-    s.sources ? `<span><strong>${s.sources}</strong> sources sélectionnées</span>` : "",
-    s.verified ? `<span><strong>${s.verified}</strong> signaux vérifiés</span>` : "",
-    s.france ? `<span><strong>${s.france}</strong> signaux France</span>` : "",
-    s.safe_links ? `<span><strong>${s.safe_links}/${state.items.length}</strong> liens filtrés</span>` : "",
+    s.sources ? `<span><strong>${s.sources}</strong> sources actives</span>` : "",
+    s.confirmed ? `<span><strong>${s.confirmed}</strong> signaux multi-confirmés</span>` : "",
+    s.official ? `<span><strong>${s.official}</strong> sources officielles</span>` : "",
+    checked ? `<span><strong>${checked}</strong> liens contrôlés · <strong>${blocked}</strong> bloqué${blocked > 1 ? "s" : ""}</span>` : "",
   ].filter(Boolean).join("");
+}
+
+function confidenceClass(level) {
+  return ["official", "confirmed", "selected", "discovery"].includes(level) ? level : "selected";
 }
 
 function render() {
@@ -146,15 +170,20 @@ function render() {
     const trust = node.querySelector(".trust");
     trust.textContent = item.trust_label || "Source filtrée";
     trust.classList.add(`trust-${item.trust || "editorial"}`);
-    trust.title = item.trust === "discovery"
-      ? "Plateforme utile pour découvrir des projets, mais le contenu n’est pas une validation journalistique."
-      : "Source retenue dans la liste blanche du Business Radar.";
 
-    const summary = node.querySelector(".summary");
-    summary.textContent = item.summary || item.domain || "Ouvrir la source pour en savoir plus.";
+    const confidence = node.querySelector(".confidence");
+    confidence.textContent = item.confidence_label || "Source unique sélectionnée";
+    confidence.classList.add(`confidence-${confidenceClass(item.confidence_level)}`);
+    confidence.title = item.confidence_note || "";
 
-    const why = node.querySelector(".why-text");
-    why.textContent = item.why || "Signal business à surveiller.";
+    node.querySelector(".summary").textContent = item.summary || "Résumé indisponible.";
+    node.querySelector(".why-text").textContent = item.why || "Signal business à surveiller.";
+
+    const sourceNames = (item.confirmation_sources || []).filter(Boolean);
+    const note = node.querySelector(".confidence-note");
+    note.textContent = item.confirmation_count > 1
+      ? `${item.confidence_note || "Signal confirmé."} Sources : ${sourceNames.join(" · ")}.`
+      : (item.confidence_note || "");
 
     const primaryTags = [];
     if (item.event && item.event !== "Business") primaryTags.push(item.event);
@@ -162,20 +191,44 @@ function render() {
     (item.sectors || []).forEach(tag => primaryTags.push(tag));
     node.querySelector(".tags").innerHTML = [...new Set(primaryTags)].slice(0, 5).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join("");
 
+    const reasons = node.querySelector(".score-reasons");
+    reasons.innerHTML = (item.score_reasons || []).map(reason => `<span>${escapeHtml(reason)}</span>`).join("") || "<span>Score calculé selon la source, la fraîcheur et le signal business.</span>";
+
+    const excerptWrap = node.querySelector(".source-excerpt-wrap");
+    if (item.source_excerpt) {
+      node.querySelector(".source-excerpt").textContent = item.source_excerpt;
+    } else {
+      excerptWrap.hidden = true;
+    }
+
     const m = item.metrics || {};
-    const metricText = [
+    node.querySelector(".metrics").textContent = [
       m.points ? `${m.points} points` : "",
       m.comments ? `${m.comments} commentaires` : "",
       item.domain || "",
     ].filter(Boolean).join(" · ");
-    node.querySelector(".metrics").textContent = metricText;
+
+    const favorite = node.querySelector(".favorite");
+    const refreshFavorite = () => {
+      const active = state.favorites.has(item.id);
+      favorite.textContent = active ? "★ Favori" : "☆ Favori";
+      favorite.classList.toggle("active", active);
+    };
+    refreshFavorite();
+    favorite.onclick = () => {
+      if (state.favorites.has(item.id)) state.favorites.delete(item.id); else state.favorites.add(item.id);
+      savePersonalization();
+      if (state.view === "Favoris") render(); else refreshFavorite();
+    };
+    node.querySelector(".more").onclick = () => updatePreference(item, 1);
+    node.querySelector(".less").onclick = () => updatePreference(item, -1);
 
     const link = node.querySelector(".read");
     const safe = item.safe_link === true && isSafeBrowserLink(item.url);
     if (safe) {
       link.href = item.url;
       link.querySelector(".read-label").textContent = item.link_label || `Ouvrir ${item.source}`;
-      link.title = `Lien filtré : ${item.domain}`;
+      link.title = `Lien direct contrôlé : ${item.domain}`;
     } else {
       link.removeAttribute("href");
       link.classList.add("blocked");
@@ -199,7 +252,7 @@ async function load() {
     const data = await response.json();
     state.items = data.items || [];
     state.stats = data.stats || {};
-    updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · liens en mode strict · automatique toutes les 6 h`;
+    updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · sources directes uniquement · automatique toutes les 6 h`;
     renderStats();
     renderFilters();
     renderTabs();
