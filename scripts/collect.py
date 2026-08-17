@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import ipaddress
 import json
 import re
 import sys
@@ -17,140 +18,156 @@ from urllib.parse import quote_plus, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.0 (+personal entrepreneurship news reader)"
-MAX_ITEMS = 150
+USER_AGENT = "BusinessRadar/2.1 (+personal entrepreneurship news reader; strict-link-mode)"
+MAX_ITEMS = 120
 
 
 def google_news_url(query: str) -> str:
     return f"https://news.google.com/rss/search?q={quote_plus(query)}&hl=fr&gl=FR&ceid=FR:fr"
 
 
+# V2.1 deliberately removes broad Google News searches. Every source is either
+# first-party / editorially curated, or a discovery platform whose link stays on
+# that platform. The collector rejects links outside the declared safe domains.
 RSS_SOURCES = [
     {
         "name": "Product Hunt",
         "url": "https://www.producthunt.com/feed",
-        "weight": 18,
+        "weight": 15,
         "region": "International",
         "default_event": "Lancement",
-        "max": 30,
+        "max": 25,
+        "trust": "discovery",
+        "trust_label": "Plateforme de découverte",
+        "source_type": "launch_platform",
+        "safe_domains": ["producthunt.com"],
+        "display_domain": "producthunt.com",
     },
     {
         "name": "TechCrunch",
         "url": "https://techcrunch.com/feed/",
-        "weight": 10,
+        "weight": 17,
         "region": "International",
         "max": 25,
+        "trust": "editorial",
+        "trust_label": "Média vérifié",
+        "source_type": "media",
+        "safe_domains": ["techcrunch.com"],
+        "display_domain": "techcrunch.com",
     },
     {
         "name": "EU-Startups",
         "url": "https://www.eu-startups.com/feed/",
-        "weight": 13,
+        "weight": 16,
         "region": "Europe",
         "max": 25,
-    },
-    {
-        "name": "France · Startups",
-        "url": google_news_url('(startup OR "jeune pousse" OR scale-up OR scaleup) France -emploi -jobs'),
-        "weight": 14,
-        "region": "France",
-        "max": 30,
-    },
-    {
-        "name": "France · Levées",
-        "url": google_news_url('(startup OR scale-up) ("levée de fonds" OR "lève" OR "tour de table" OR "série A" OR "série B" OR seed) France'),
-        "weight": 18,
-        "region": "France",
-        "default_event": "Levée",
-        "max": 25,
-    },
-    {
-        "name": "France · Lancements",
-        "url": google_news_url('(startup OR entrepreneur) (lance OR lancement OR dévoile OR "nouveau service" OR "nouvelle plateforme" OR "nouveau produit") France'),
-        "weight": 17,
-        "region": "France",
-        "default_event": "Lancement",
-        "max": 25,
-    },
-    {
-        "name": "France · M&A",
-        "url": google_news_url('(startup OR scale-up) (acquisition OR rachat OR rachète OR fusion OR cède) France'),
-        "weight": 17,
-        "region": "France",
-        "default_event": "Acquisition",
-        "max": 20,
+        "trust": "editorial",
+        "trust_label": "Média vérifié",
+        "source_type": "media",
+        "safe_domains": ["eu-startups.com"],
+        "display_domain": "eu-startups.com",
     },
     {
         "name": "Maddyness",
-        "url": google_news_url('site:maddyness.com (startup OR entrepreneur OR levée OR lance OR acquisition)'),
-        "weight": 16,
+        "url": google_news_url('site:maddyness.com (startup OR entrepreneur OR levée OR lance OR acquisition OR croissance)'),
+        "weight": 18,
         "region": "France",
         "max": 25,
+        "trust": "editorial",
+        "trust_label": "Média vérifié",
+        "source_type": "media",
+        "safe_domains": ["news.google.com"],
+        "display_domain": "maddyness.com",
+        "publisher_patterns": [r"maddyness"],
     },
     {
         "name": "FrenchWeb",
-        "url": google_news_url('site:frenchweb.fr (startup OR entrepreneur OR levée OR lance OR acquisition)'),
-        "weight": 15,
+        "url": google_news_url('site:frenchweb.fr (startup OR entrepreneur OR levée OR lance OR acquisition OR croissance)'),
+        "weight": 17,
         "region": "France",
         "max": 25,
+        "trust": "editorial",
+        "trust_label": "Média vérifié",
+        "source_type": "media",
+        "safe_domains": ["news.google.com"],
+        "display_domain": "frenchweb.fr",
+        "publisher_patterns": [r"frenchweb"],
     },
     {
         "name": "Bpifrance",
-        "url": google_news_url('site:bpifrance.fr (startup OR entrepreneur OR innovation OR financement)'),
-        "weight": 11,
+        "url": google_news_url('site:bpifrance.fr OR site:presse.bpifrance.fr (startup OR innovation OR financement OR levée OR acquisition)'),
+        "weight": 20,
+        "region": "France",
+        "max": 20,
+        "trust": "official",
+        "trust_label": "Source officielle",
+        "source_type": "official",
+        "safe_domains": ["news.google.com"],
+        "display_domain": "bpifrance.fr",
+        "publisher_patterns": [r"bpifrance"],
+    },
+    {
+        "name": "La French Tech",
+        "url": google_news_url('site:lafrenchtech.com (startup OR innovation OR lauréat OR programme OR financement)'),
+        "weight": 20,
         "region": "France",
         "max": 18,
+        "trust": "official",
+        "trust_label": "Source officielle",
+        "source_type": "official",
+        "safe_domains": ["news.google.com"],
+        "display_domain": "lafrenchtech.com",
+        "publisher_patterns": [r"french tech"],
+    },
+    {
+        "name": "Sifted",
+        "url": google_news_url('site:sifted.eu (startup OR funding OR acquisition OR launch OR growth)'),
+        "weight": 18,
+        "region": "Europe",
+        "max": 22,
+        "trust": "editorial",
+        "trust_label": "Média vérifié",
+        "source_type": "media",
+        "safe_domains": ["news.google.com"],
+        "display_domain": "sifted.eu",
+        "publisher_patterns": [r"sifted"],
     },
 ]
 
 HN_ENDPOINTS = [
-    ("Show HN", "https://hacker-news.firebaseio.com/v0/showstories.json", 40, 15),
+    {
+        "name": "Show HN",
+        "endpoint": "https://hacker-news.firebaseio.com/v0/showstories.json",
+        "limit": 35,
+        "weight": 12,
+        "trust": "discovery",
+        "trust_label": "Communauté · à vérifier",
+        "source_type": "community",
+        "safe_domains": ["news.ycombinator.com"],
+        "display_domain": "news.ycombinator.com",
+    }
 ]
 
-# Strong event patterns: intentionally stricter than V1 to avoid tagging generic
-# articles about public/research funding as startup fundraising.
+TRUST_RANK = {"official": 3, "editorial": 2, "discovery": 1}
+
 EVENT_PATTERNS = {
     "Levée": [
-        r"\blev[ée]e de fonds\b",
-        r"\btour de table\b",
-        r"\bl[èe]ve\s+(?:plus de\s+)?(?:\d|\$|€)",
-        r"\braises?\s+(?:\$|€|£|\d)",
-        r"\braised\s+(?:\$|€|£|\d)",
-        r"\bfunding round\b",
-        r"\bseries\s+[a-e]\b",
-        r"\bpre[- ]seed\b",
-        r"\bseed round\b",
-        r"\bventure round\b",
+        r"\blev[ée]e de fonds\b", r"\btour de table\b", r"\bl[èe]ve\s+(?:plus de\s+)?(?:\d|\$|€)",
+        r"\braises?\s+(?:\$|€|£|\d)", r"\braised\s+(?:\$|€|£|\d)", r"\bfunding round\b",
+        r"\bseries\s+[a-e]\b", r"\bpre[- ]seed\b", r"\bseed round\b", r"\bventure round\b",
     ],
     "Acquisition": [
-        r"\bacqui(?:res?|red|sition)\b",
-        r"\bbuy(?:s|ing)?\b",
-        r"\btakeover\b",
-        r"\brachat\b",
-        r"\brach[èe]te\b",
-        r"\bacquisition\b",
-        r"\bfusion\b",
-        r"\bmerger\b",
+        r"\bacqui(?:res?|red|sition)\b", r"\bbuy(?:s|ing)?\b", r"\btakeover\b", r"\brachat\b",
+        r"\brach[èe]te\b", r"\bacquisition\b", r"\bfusion\b", r"\bmerger\b",
     ],
     "Lancement": [
-        r"\blaunch(?:es|ed|ing)?\b",
-        r"\bunveil(?:s|ed)?\b",
-        r"\bintroduc(?:es|ed|ing)\b",
-        r"\blanc(?:e|ent|ement)\b",
-        r"\bd[ée]voile\b",
-        r"\bnouveau (?:produit|service|logiciel|saas|outil)\b",
-        r"\bnouvelle (?:plateforme|application|offre|solution)\b",
-        r"\bshow hn\b",
+        r"\blaunch(?:es|ed|ing)?\b", r"\bunveil(?:s|ed)?\b", r"\bintroduc(?:es|ed|ing)\b",
+        r"\blanc(?:e|ent|ement)\b", r"\bd[ée]voile\b", r"\bnouveau (?:produit|service|logiciel|saas|outil)\b",
+        r"\bnouvelle (?:plateforme|application|offre|solution)\b", r"\bshow hn\b",
     ],
     "Croissance": [
-        r"\bprofitable\b",
-        r"\bprofitability\b",
-        r"\bmrr\b",
-        r"\barr\b",
-        r"\brevenue\b",
-        r"\bchiffre d['’]affaires\b",
-        r"\bgrowth\b",
-        r"\bcroissance\b",
-        r"\bclients?\b",
+        r"\bprofitable\b", r"\bprofitability\b", r"\bmrr\b", r"\barr\b", r"\brevenue\b",
+        r"\bchiffre d['’]affaires\b", r"\bgrowth\b", r"\bcroissance\b", r"\bclients?\b",
     ],
 }
 
@@ -169,33 +186,22 @@ SECTOR_PATTERNS = {
 }
 
 BUSINESS_TERMS = [
-    "startup", "founder", "entrepreneur", "company", "business", "saas", "product",
-    "launch", "customer", "revenue", "funding", "venture", "marketplace", "platform",
-    "software", "commercial", "entreprise", "levée", "lance", "acquisition", "croissance",
-    "chiffre d'affaires", "innovation", "scale-up", "scaleup",
+    "startup", "founder", "entrepreneur", "company", "business", "saas", "product", "launch", "customer",
+    "revenue", "funding", "venture", "marketplace", "platform", "software", "commercial", "entreprise",
+    "levée", "lance", "acquisition", "croissance", "chiffre d'affaires", "innovation", "scale-up", "scaleup",
 ]
 
 EXCLUDE_PATTERNS = [
-    r"\bjob(?:s)?\b",
-    r"\bhiring\b",
-    r"\bcareer(?:s)?\b",
-    r"\brecrutement\b",
-    r"\boffre d['’]emploi\b",
-    r"\bpolitics?\b",
-    r"\belection\b",
+    r"\bjob(?:s)?\b", r"\bhiring\b", r"\bcareer(?:s)?\b", r"\brecrutement\b", r"\boffre d['’]emploi\b",
+    r"\bpolitics?\b", r"\belection\b",
 ]
 
 PERSONAL_BOOSTS = {
-    "France": 8,
-    "Lancement": 12,
-    "Levée": 9,
-    "Acquisition": 8,
-    "SaaS": 8,
-    "IA": 5,
-    "Sales": 6,
-    "Fintech": 4,
-    "E-commerce": 4,
+    "France": 8, "Lancement": 12, "Levée": 9, "Acquisition": 8, "SaaS": 8, "IA": 5,
+    "Sales": 6, "Fintech": 4, "E-commerce": 4,
 }
+
+BLOCKED_DOWNLOAD_EXTENSIONS = (".exe", ".msi", ".dmg", ".pkg", ".apk", ".zip", ".rar", ".7z", ".iso")
 
 
 def http_get(url: str, timeout: int = 25) -> bytes:
@@ -218,8 +224,7 @@ def clean_text(value: str | None) -> str:
     if not value:
         return ""
     value = html.unescape(re.sub(r"<[^>]+>", " ", value))
-    value = re.sub(r"\s+", " ", value).strip()
-    return value
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def short_text(value: str, max_chars: int = 300) -> str:
@@ -269,6 +274,44 @@ def matches_any(patterns: list[str], text: str) -> bool:
     return any(re.search(pattern, text, flags=re.I) for pattern in patterns)
 
 
+def host_matches(hostname: str, allowed: str) -> bool:
+    hostname = hostname.lower().rstrip(".")
+    allowed = allowed.lower().rstrip(".")
+    return hostname == allowed or hostname.endswith("." + allowed)
+
+
+def is_safe_url(url: str, safe_domains: list[str]) -> bool:
+    try:
+        parsed = urlparse(url.strip())
+        if parsed.scheme != "https" or not parsed.hostname:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        host = parsed.hostname.lower().rstrip(".")
+        if host.startswith("xn--") or ".xn--" in host:
+            return False
+        try:
+            ipaddress.ip_address(host)
+            return False
+        except ValueError:
+            pass
+        if not any(host_matches(host, allowed) for allowed in safe_domains):
+            return False
+        path = parsed.path.lower()
+        if any(path.endswith(ext) for ext in BLOCKED_DOWNLOAD_EXTENSIONS):
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def publisher_is_trusted(publisher: str, patterns: list[str] | None) -> bool:
+    if not patterns:
+        return True
+    cleaned = clean_text(publisher).lower()
+    return any(re.search(pattern, cleaned, flags=re.I) for pattern in patterns)
+
+
 def detect_event(text: str, default_event: str | None = None) -> str:
     t = text.lower()
     for event in ["Levée", "Acquisition", "Lancement", "Croissance"]:
@@ -299,11 +342,10 @@ def detect_region(text: str, default_region: str | None = None) -> str:
 
 def business_relevance(title: str, summary: str, source: str, event: str) -> int:
     t = f"{title} {summary} {source}".lower()
-    score = 0
-    score += sum(2 for term in BUSINESS_TERMS if term in t)
+    score = sum(2 for term in BUSINESS_TERMS if term in t)
     if event != "Business":
         score += 5
-    if source in {"Product Hunt", "Show HN", "EU-Startups", "Maddyness", "FrenchWeb"}:
+    if source in {"Product Hunt", "Show HN", "EU-Startups", "Maddyness", "FrenchWeb", "Sifted"}:
         score += 4
     return score
 
@@ -312,8 +354,6 @@ def should_exclude(title: str, summary: str, source: str, event: str) -> bool:
     text = f"{title} {summary}".lower()
     if matches_any(EXCLUDE_PATTERNS, text):
         return True
-    # Product Hunt and Show HN are creation/lauch sources, so keep them even if
-    # the title does not contain generic business words.
     if source in {"Product Hunt", "Show HN"}:
         return False
     return business_relevance(title, summary, source, event) < 4
@@ -323,34 +363,24 @@ def why_interesting(event: str, sectors: list[str], region: str, source: str) ->
     sector = sectors[0] if sectors else "ce marché"
     if event == "Lancement":
         if source in {"Product Hunt", "Show HN"}:
-            return f"Un produit vient d’être mis sur le marché : utile pour repérer tôt un besoin, un positionnement ou un modèle économique dans {sector}."
+            return f"Signal de lancement précoce : utile pour repérer un besoin, un positionnement ou un modèle économique émergent dans {sector}."
         return f"Nouveau produit ou service à surveiller : cela peut révéler une demande émergente ou une nouvelle façon d’adresser {sector}."
     if event == "Levée":
-        return f"Une levée est un signal de traction et de conviction des investisseurs ; elle indique aussi où le capital se dirige dans {sector}."
+        return f"Une levée peut signaler de la traction et montre où les investisseurs concentrent du capital dans {sector}."
     if event == "Acquisition":
-        return f"Cette opération montre un mouvement de consolidation ou une valeur stratégique attribuée à {sector}."
+        return f"Cette opération peut signaler une consolidation du marché ou une valeur stratégique croissante attribuée à {sector}."
     if event == "Croissance":
-        return "Signal de traction commerciale : les données de croissance, revenus ou clients permettent de voir quels modèles fonctionnent réellement."
+        return "Signal de traction commerciale : croissance, revenus ou clients permettent d’identifier les modèles qui commencent à fonctionner."
     if region == "France":
         return "Signal entrepreneurial français à suivre pour repérer les entreprises, marchés et modèles qui gagnent en visibilité localement."
-    return "Signal business à surveiller : il peut révéler une tendance, un nouvel acteur ou un changement de marché avant qu’il ne devienne évident."
+    return "Signal business à surveiller : il peut révéler une tendance, un nouvel acteur ou un changement de marché."
 
 
-def score_item(
-    title: str,
-    summary: str,
-    source_weight: int,
-    event: str,
-    sectors: list[str],
-    region: str,
-    published_at: str,
-    points: int = 0,
-    comments: int = 0,
-) -> int:
-    score = 38 + source_weight
+def score_item(title: str, summary: str, source_weight: int, trust: str, event: str, sectors: list[str], region: str,
+               published_at: str, points: int = 0, comments: int = 0) -> int:
+    score = 34 + source_weight + {"official": 8, "editorial": 5, "discovery": 0}.get(trust, 0)
     tags = [event, region, *sectors]
     score += sum(PERSONAL_BOOSTS.get(tag, 0) for tag in tags)
-
     hours = age_hours(published_at)
     if hours <= 6:
         score += 10
@@ -360,10 +390,8 @@ def score_item(
         score += 4
     elif hours > 24 * 14:
         score -= 8
-
     score += min(points // 20, 10)
     score += min(comments // 20, 6)
-
     text = f"{title} {summary}".lower()
     if any(k in text for k in ["mrr", "arr", "revenue", "chiffre d'affaires", "customers", "clients"]):
         score += 5
@@ -395,53 +423,48 @@ def source_name_from_rss(entry: ET.Element, fallback: str) -> str:
     return fallback
 
 
-def make_item(
-    *,
-    title: str,
-    summary: str,
-    url: str,
-    source: str,
-    published_at: str,
-    source_weight: int,
-    default_region: str | None = None,
-    default_event: str | None = None,
-    points: int = 0,
-    comments: int = 0,
-) -> dict | None:
+def fallback_summary(title: str, source: str, event: str) -> str:
+    clean_title = re.sub(r"^Show HN:\s*", "", title, flags=re.I).strip()
+    if source == "Show HN":
+        return f"Projet présenté sur Show HN : {clean_title}. La fiche ouvre uniquement la discussion Hacker News, pas le site externe du projet."
+    if source == "Product Hunt":
+        return f"Produit repéré sur Product Hunt : {clean_title}."
+    if event == "Levée":
+        return f"Actualité de financement concernant : {clean_title}."
+    if event == "Acquisition":
+        return f"Actualité de rapprochement ou d’acquisition concernant : {clean_title}."
+    return f"Actualité entrepreneuriale : {clean_title}."
+
+
+def make_item(*, title: str, summary: str, url: str, source: str, published_at: str, source_weight: int,
+              trust: str, trust_label: str, source_type: str, safe_domains: list[str], display_domain: str,
+              default_region: str | None = None, default_event: str | None = None, points: int = 0,
+              comments: int = 0) -> dict | None:
     title = clean_text(title)
-    summary = short_text(summary, 320)
-    if not title or not url:
+    summary = short_text(summary, 340)
+    if not title or not url or not is_safe_url(url, safe_domains):
         return None
 
     context = f"{title} {summary} {source}"
     event = detect_event(context, default_event)
     sectors = detect_sectors(context)
     region = detect_region(context, default_region)
-
     if should_exclude(title, summary, source, event):
         return None
 
-    score = score_item(
-        title,
-        summary,
-        source_weight,
-        event,
-        sectors,
-        region,
-        published_at,
-        points,
-        comments,
-    )
+    if not summary:
+        summary = fallback_summary(title, source, event)
+
+    score = score_item(title, summary, source_weight, trust, event, sectors, region, published_at, points, comments)
     categories = [event, *sectors]
     if region in {"France", "Europe"}:
         categories.append(region)
-    # Preserve order while removing duplicates.
     categories = list(dict.fromkeys(categories))[:5]
 
     return {
         "id": item_id(url, title),
         "title": title,
-        "summary": summary or "Ouvrir la source pour découvrir le projet ou l’actualité.",
+        "summary": summary,
         "why": why_interesting(event, sectors, region, source),
         "url": url,
         "source": source,
@@ -452,8 +475,14 @@ def make_item(
         "sectors": sectors,
         "score": score,
         "interest": interest_label(score),
-        "domain": urlparse(url).netloc.replace("www.", ""),
+        "domain": display_domain,
         "metrics": {"points": points, "comments": comments} if points or comments else {},
+        "trust": trust,
+        "trust_rank": TRUST_RANK.get(trust, 0),
+        "trust_label": trust_label,
+        "source_type": source_type,
+        "safe_link": True,
+        "link_label": f"Ouvrir {source}",
     }
 
 
@@ -475,25 +504,29 @@ def fetch_rss(source: dict) -> list[dict]:
                 link_node = entry.find("{http://www.w3.org/2005/Atom}link")
             url = link_node.attrib.get("href", "") if link_node is not None else ""
             published_raw = first_text(entry, ["{http://www.w3.org/2005/Atom}published", "{http://www.w3.org/2005/Atom}updated"])
-            actual_source = source["name"]
+            publisher = source["name"]
         else:
             title = first_text(entry, ["title"])
             summary = first_text(entry, ["description", "{http://purl.org/rss/1.0/modules/content/}encoded"])
             url = first_text(entry, ["link"])
             published_raw = first_text(entry, ["pubDate", "{http://purl.org/dc/elements/1.1/}date"])
-            actual_source = source_name_from_rss(entry, source["name"])
-            # For curated Google News queries, the actual publication name is
-            # more useful than the query bucket in the card.
-            if source["name"].startswith("France ·"):
-                actual_source = actual_source or source["name"]
+            publisher = source_name_from_rss(entry, source["name"])
+
+        if not publisher_is_trusted(publisher, source.get("publisher_patterns")):
+            continue
 
         item = make_item(
             title=title,
             summary=summary,
             url=url,
-            source=actual_source,
+            source=source["name"],
             published_at=parse_date(published_raw),
             source_weight=source["weight"],
+            trust=source["trust"],
+            trust_label=source["trust_label"],
+            source_type=source["source_type"],
+            safe_domains=source["safe_domains"],
+            display_domain=source["display_domain"],
             default_region=source.get("region"),
             default_event=source.get("default_event"),
         )
@@ -502,15 +535,17 @@ def fetch_rss(source: dict) -> list[dict]:
     return items
 
 
-def fetch_hn(name: str, endpoint: str, limit: int, weight: int) -> list[dict]:
-    ids = http_json(endpoint)[:limit]
+def fetch_hn(spec: dict) -> list[dict]:
+    ids = http_json(spec["endpoint"])[: spec["limit"]]
     items = []
     for story_id in ids:
         story = http_json(f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json") or {}
         if story.get("type") != "story":
             continue
         title = clean_text(story.get("title"))
-        url = story.get("url") or f"https://news.ycombinator.com/item?id={story_id}"
+        # Strict mode: never link directly to the founder's arbitrary domain.
+        # The card opens only the Hacker News discussion page.
+        url = f"https://news.ycombinator.com/item?id={story_id}"
         summary = clean_text(story.get("text"))
         published = datetime.fromtimestamp(story.get("time", 0), tz=timezone.utc).isoformat()
         points = int(story.get("score", 0) or 0)
@@ -519,9 +554,14 @@ def fetch_hn(name: str, endpoint: str, limit: int, weight: int) -> list[dict]:
             title=title,
             summary=summary,
             url=url,
-            source=name,
+            source=spec["name"],
             published_at=published,
-            source_weight=weight,
+            source_weight=spec["weight"],
+            trust=spec["trust"],
+            trust_label=spec["trust_label"],
+            source_type=spec["source_type"],
+            safe_domains=spec["safe_domains"],
+            display_domain=spec["display_domain"],
             default_event="Lancement",
             points=points,
             comments=comments,
@@ -541,11 +581,7 @@ def dedupe(items: Iterable[dict]) -> list[dict]:
     seen_titles = set()
     seen_urls = set()
     out = []
-    for item in sorted(
-        items,
-        key=lambda x: (x.get("score", 0), x.get("published_at", "")),
-        reverse=True,
-    ):
+    for item in sorted(items, key=lambda x: (x.get("trust_rank", 0), x.get("score", 0), x.get("published_at", "")), reverse=True):
         title_key = normalize_title(item["title"])
         url_key = re.sub(r"[?#].*$", "", item["url"])
         if not title_key or title_key in seen_titles or url_key in seen_urls:
@@ -562,30 +598,44 @@ def build_demo() -> list[dict]:
         {
             "title": "Une startup française lance un SaaS de prospection B2B assisté par IA",
             "summary": "Le produit automatise la qualification des prospects et la préparation des séquences commerciales pour les PME.",
-            "url": "https://example.com/saas",
+            "url": "https://www.maddyness.com/article/demo",
             "source": "Maddyness",
             "published_at": now.isoformat(),
-            "source_weight": 16,
+            "source_weight": 18,
+            "trust": "editorial",
+            "trust_label": "Média vérifié",
+            "source_type": "media",
+            "safe_domains": ["maddyness.com"],
+            "display_domain": "maddyness.com",
             "default_region": "France",
             "default_event": "Lancement",
         },
         {
-            "title": "Fintech française : une jeune pousse lève 8 M€ pour accélérer en Europe",
-            "summary": "Le financement doit permettre à l'entreprise de recruter et d'étendre son produit à plusieurs marchés européens.",
-            "url": "https://example.com/funding",
-            "source": "FrenchWeb",
-            "published_at": (now - timedelta(hours=3)).isoformat(),
-            "source_weight": 15,
+            "title": "Bpifrance annonce un nouveau programme d'accompagnement deeptech",
+            "summary": "Le dispositif cible les jeunes entreprises innovantes et renforce l'accompagnement à l'industrialisation.",
+            "url": "https://www.bpifrance.fr/demo",
+            "source": "Bpifrance",
+            "published_at": (now - timedelta(hours=2)).isoformat(),
+            "source_weight": 20,
+            "trust": "official",
+            "trust_label": "Source officielle",
+            "source_type": "official",
+            "safe_domains": ["bpifrance.fr"],
+            "display_domain": "bpifrance.fr",
             "default_region": "France",
-            "default_event": "Levée",
         },
         {
             "title": "Show HN: an AI agent that turns customer calls into CRM actions",
-            "summary": "A founder is launching a lightweight agent for sales teams and asking the Hacker News community for feedback.",
-            "url": "https://example.com/showhn",
+            "summary": "",
+            "url": "https://news.ycombinator.com/item?id=123456",
             "source": "Show HN",
             "published_at": (now - timedelta(hours=1)).isoformat(),
-            "source_weight": 15,
+            "source_weight": 12,
+            "trust": "discovery",
+            "trust_label": "Communauté · à vérifier",
+            "source_type": "community",
+            "safe_domains": ["news.ycombinator.com"],
+            "display_domain": "news.ycombinator.com",
             "default_event": "Lancement",
             "points": 98,
             "comments": 42,
@@ -605,6 +655,8 @@ def stats_for(items: list[dict]) -> dict:
         "france": sum(1 for item in items if item.get("region") == "France"),
         "launches": sum(1 for item in items if item.get("event") == "Lancement"),
         "funding_ma": sum(1 for item in items if item.get("event") in {"Levée", "Acquisition"}),
+        "verified": sum(1 for item in items if item.get("trust") in {"official", "editorial"}),
+        "safe_links": sum(1 for item in items if item.get("safe_link")),
     }
 
 
@@ -617,7 +669,7 @@ def main() -> int:
     errors: list[str] = []
 
     if args.demo:
-        items = [x for x in build_demo() if x]
+        items = build_demo()
     else:
         for source in RSS_SOURCES:
             try:
@@ -626,13 +678,14 @@ def main() -> int:
                 errors.append(f"{source['name']}: {exc}")
         for spec in HN_ENDPOINTS:
             try:
-                items.extend(fetch_hn(*spec))
+                items.extend(fetch_hn(spec))
             except Exception as exc:
-                errors.append(f"{spec[0]}: {exc}")
+                errors.append(f"{spec['name']}: {exc}")
         items = dedupe(items)
 
     payload = {
-        "version": 2,
+        "version": "2.1",
+        "strict_link_mode": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "count": len(items),
         "stats": stats_for(items),
