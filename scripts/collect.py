@@ -19,10 +19,10 @@ from urllib.parse import urlparse, urljoin
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.5 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.6 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
-# V2.5: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
+# V2.6: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
 # founder website links in the trusted feed.
 RSS_SOURCES = [
     {
@@ -134,12 +134,12 @@ HTML_SOURCES = [
     },
     {
         "name": "European Innovation Council",
-        "listing_url": "https://eic.ec.europa.eu/european-innovation-council_en",
+        "listing_url": "https://eic.ec.europa.eu/eic-funding-opportunities/eic-accelerator_en",
         "link_pattern": r"^/news/[^?#]+(?:_en)?$",
         "weight": 24,
         "region": "Europe",
         "max": 14,
-        "max_age_days": 45,
+        "max_age_days": 90,
         "trust": "official",
         "trust_label": "Source officielle UE",
         "source_type": "official",
@@ -169,10 +169,22 @@ EVENT_PATTERNS = {
         r"\blev[ée]e de fonds\b", r"\btour de table\b", r"\bl[èe]ve\s+(?:plus de\s+)?(?:\d|\$|€|£)",
         r"\braises?\s+(?:\$|€|£|\d)", r"\braised\s+(?:\$|€|£|\d)", r"\bsecures?\s+(?:\$|€|£|\d)",
         r"\bfunding round\b", r"\bseries\s+[a-e]\b", r"\bpre[- ]seed\b", r"\bseed round\b",
+        r"\binvestment from\b", r"\binvests?\s+(?:\$|€|£|\d)",
     ],
     "Acquisition": [
         r"\bacqui(?:res?|red|sition)\b", r"\btakeover\b", r"\brachat\b", r"\brach[èe]te\b",
         r"\bacquisition\b", r"\bfusion\b", r"\bmerger\b",
+    ],
+    "Expansion": [
+        r"\bexpands? into\b", r"\binternational expansion\b", r"\benters? the .{0,35} market\b",
+        r"\bopens? (?:a |its )?(?:new )?(?:office|hub|site|factory|plant)\b",
+        r"\bs['’]implante\b", r"\bse d[ée]ploie\b", r"\bouvre (?:un|une) (?:bureau|site|usine)\b",
+        r"\bnouveau march[ée]\b", r"\bnew market\b",
+    ],
+    "Partenariat": [
+        r"\bstrategic partnership\b", r"\bpartners? with\b", r"\bpartnership with\b",
+        r"\bpartenariat strat[ée]gique\b", r"\bs['’]associe avec\b", r"\bcollaboration with\b",
+        r"\bsigns? (?:a )?(?:major |strategic )?(?:deal|agreement) with\b",
     ],
     "Lancement": [
         r"\blaunch(?:es|ed|ing)?\b", r"\bunveil(?:s|ed)?\b", r"\bintroduc(?:es|ed|ing)\b",
@@ -182,6 +194,7 @@ EVENT_PATTERNS = {
     "Croissance": [
         r"\bprofitable\b", r"\bprofitability\b", r"\bmrr\b", r"\barr\b", r"\brevenue\b",
         r"\bchiffre d['’]affaires\b", r"\bgrowth\b", r"\bcroissance\b",
+        r"\bvaluation\b", r"\bvalorisation\b", r"\bunicorn\b",
     ],
 }
 
@@ -205,7 +218,34 @@ BUSINESS_TERMS = [
     "levée", "lance", "acquisition", "croissance", "chiffre d'affaires", "innovation", "scale-up", "scaleup",
 ]
 EXCLUDE_PATTERNS = [r"\bjob(?:s)?\b", r"\bhiring\b", r"\bcareer(?:s)?\b", r"\brecrutement\b", r"\boffre d['’]emploi\b"]
-PERSONAL_BOOSTS = {"France": 8, "Lancement": 12, "Levée": 9, "Acquisition": 8, "SaaS": 8, "IA": 5, "Sales": 6, "Fintech": 4}
+PERSONAL_BOOSTS = {
+    "France": 9, "Europe": 4, "Lancement": 8, "Levée": 16, "Acquisition": 14, "Expansion": 12,
+    "Partenariat": 10, "Croissance": 11, "SaaS": 5, "IA": 3, "Sales": 4, "Fintech": 4, "Deeptech": 4,
+}
+
+# V2.6: the score is deliberately entrepreneurship-first. Product features from very large platforms
+# remain visible, but they should not outrank fundraising, launches, expansion, M&A or hard traction signals.
+LOW_VALUE_PATTERNS = [
+    r"\bnew feature\b", r"\badds? (?:a |an )?(?:new )?feature\b", r"\bnow lets? users\b",
+    r"\bplaylist\b", r"\bredesign\b", r"\binterface update\b", r"\bminor update\b",
+    r"\bhow to\b", r"\bguide to\b", r"\btips? for\b", r"\breview\b", r"\bwhat is\b",
+]
+ESTABLISHED_PLATFORM_NAMES = {
+    "spotify", "apple", "google", "microsoft", "meta", "amazon", "netflix", "tiktok", "youtube",
+    "openai", "x", "twitter", "snap", "snapchat",
+}
+STARTUP_MARKERS = [
+    r"\bstartup\b", r"\bstart-up\b", r"\bscale-?up\b", r"\bfounder\b", r"\bfounded\b",
+    r"\bentrepreneur\b", r"\bjeune pousse\b", r"\bpme innovante\b",
+]
+HARD_BUSINESS_METRICS = {
+    "Financement chiffré": [r"(?:raises?|raised|secures?|secured|investment|lev[ée]e|tour de table).{0,35}(?:[$€£]\s?\d|\d+(?:[.,]\d+)?\s?(?:million|milliard|billion|bn))"],
+    "Valorisation": [r"\bvaluation\b", r"\bvalorisation\b", r"\bunicorn\b"],
+    "Revenus": [r"\b(?:arr|mrr|revenue|revenues|chiffre d['’]affaires|sales)\b.{0,30}(?:[$€£]\s?\d|\d+(?:[.,]\d+)?\s?(?:million|milliard|billion|bn))"],
+    "Traction clients": [r"\b\d+(?:[.,]\d+)?\s?(?:k|m|million|millions)?\s+(?:users?|customers?|clients?|subscribers?|abonn[ée]s)\b"],
+    "Croissance chiffrée": [r"\b\d+(?:[.,]\d+)?%\s+(?:growth|croissance|increase|hausse)\b", r"\b(?:growth|croissance).{0,20}\d+(?:[.,]\d+)?%\b"],
+}
+
 BLOCKED_DOWNLOAD_EXTENSIONS = (".exe", ".msi", ".dmg", ".pkg", ".apk", ".zip", ".rar", ".7z", ".iso")
 STOPWORDS = {
     "the", "and", "for", "with", "from", "that", "this", "into", "after", "before", "its", "their", "about",
@@ -313,7 +353,7 @@ def is_safe_url(url: str, safe_domains: list[str]) -> bool:
 
 def detect_event(text: str, default_event: str | None = None) -> str:
     t = text.lower()
-    for event in ["Levée", "Acquisition", "Lancement", "Croissance"]:
+    for event in ["Levée", "Acquisition", "Expansion", "Partenariat", "Lancement", "Croissance"]:
         if matches_any(EVENT_PATTERNS[event], t):
             return event
     return default_event or "Business"
@@ -402,6 +442,10 @@ def french_digest(title: str, source_summary: str, event: str, source: str, sect
         return f"{subject} annonce un nouveau financement. Le signal mérite d’être suivi pour mesurer sa traction et ses ambitions de croissance."
     if event == "Acquisition":
         return f"{subject} est au cœur d’une opération d’acquisition ou de rapprochement. Cela peut signaler une consolidation du marché" + (f" dans {sector}." if sector else ".")
+    if event == "Expansion":
+        return f"{subject} accélère son expansion ou son implantation sur un nouveau marché" + (f" dans {sector}." if sector else ".")
+    if event == "Partenariat":
+        return f"{subject} annonce un partenariat stratégique ou commercial" + (f" dans {sector}." if sector else ".")
     if event == "Lancement":
         if source == "Show HN":
             return f"Nouveau projet présenté sur Show HN : {subject}. Le lien du radar ouvre uniquement la discussion Hacker News, pas le site externe du créateur."
@@ -415,49 +459,114 @@ def french_digest(title: str, source_summary: str, event: str, source: str, sect
     return f"Actualité entrepreneuriale concernant {subject}. Le lien renvoie directement vers {source}, une source autorisée par le radar."
 
 
+def hard_business_metric_bonus(text: str) -> tuple[int, list[str]]:
+    bonus = 0
+    reasons: list[str] = []
+    for label, patterns in HARD_BUSINESS_METRICS.items():
+        if matches_any(patterns, text.lower()):
+            add = {"Financement chiffré": 8, "Valorisation": 7, "Revenus": 7, "Traction clients": 5, "Croissance chiffrée": 5}.get(label, 4)
+            bonus += add
+            reasons.append(f"{label} +{add}")
+    return min(bonus, 14), reasons[:2]
+
+
+def established_platform_subject(title: str) -> bool:
+    subject = normalize_entity(extract_subject(title))
+    tokens = set(subject.split())
+    return bool(tokens & ESTABLISHED_PLATFORM_NAMES)
+
+
+def entrepreneurship_adjustment(title: str, summary: str, event: str) -> tuple[int, list[str]]:
+    text = f"{title} {summary}".lower()
+    reasons: list[str] = []
+    delta = 0
+    metric_bonus, metric_reasons = hard_business_metric_bonus(text)
+    if metric_bonus:
+        delta += metric_bonus
+        reasons.extend(metric_reasons)
+    if matches_any(STARTUP_MARKERS, text):
+        delta += 4
+        reasons.append("Startup / scale-up +4")
+    if event in {"Levée", "Acquisition", "Expansion", "Partenariat", "Croissance"}:
+        # These events are structurally closer to the user's business-monitoring goal than a generic feature release.
+        delta += 3
+        reasons.append("Signal business structurant +3")
+    weak_update = matches_any(LOW_VALUE_PATTERNS, text)
+    hard_signal = bool(metric_bonus) or event in {"Levée", "Acquisition", "Expansion", "Partenariat", "Croissance"}
+    if weak_update and not hard_signal:
+        delta -= 15
+        reasons.append("Simple actualité produit −15")
+    if established_platform_subject(title) and event in {"Lancement", "Business"} and not hard_signal:
+        delta -= 12
+        reasons.append("Grande plateforme, enjeu entrepreneurial faible −12")
+    return delta, reasons[:4]
+
+
 def why_interesting(event: str, sectors: list[str], region: str) -> str:
     sector = sector_phrase(sectors) or "ce marché"
     if event == "Lancement": return f"Permet de repérer tôt un nouveau besoin, un positionnement ou un modèle économique dans {sector}."
     if event == "Levée": return f"Une levée peut signaler de la traction et montre où les investisseurs concentrent du capital dans {sector}."
     if event == "Acquisition": return f"Peut signaler une consolidation du marché ou une valeur stratégique croissante dans {sector}."
+    if event == "Expansion": return f"Une expansion géographique ou industrielle aide à repérer les entreprises qui passent à l'échelle dans {sector}."
+    if event == "Partenariat": return f"Un partenariat stratégique peut accélérer la distribution, l'accès au marché ou la crédibilité commerciale dans {sector}."
     if event == "Croissance": return "Les revenus, clients ou indicateurs de croissance aident à identifier les modèles qui commencent à fonctionner."
     if region == "France": return "Signal français utile pour suivre les entreprises et marchés qui gagnent en visibilité localement."
     return "Signal business utile pour repérer une tendance, un nouvel acteur ou un changement de marché."
 
 
-def score_item(source_weight: int, trust: str, event: str, sectors: list[str], region: str, published_at: str, points: int = 0, comments: int = 0) -> tuple[int, list[str]]:
-    score = 34 + source_weight
+def score_item(source_weight: int, trust: str, event: str, sectors: list[str], region: str, published_at: str,
+               points: int = 0, comments: int = 0, title: str = "", summary: str = "") -> tuple[int, list[str]]:
+    # Lower fixed base than V2.5: the score now has room to reward concrete entrepreneurial value.
+    score = 20 + source_weight
     reasons = [f"Source pondérée +{source_weight}"]
-    trust_bonus = {"official": 12, "reference": 8, "editorial": 5, "discovery": 0}.get(trust, 0)
+
+    trust_bonus = {"official": 11, "reference": 7, "editorial": 4, "discovery": -2}.get(trust, 0)
     score += trust_bonus
-    if trust_bonus:
+    if trust_bonus > 0:
         trust_name = {"official": "Source officielle", "reference": "Média de référence", "editorial": "Média spécialisé"}.get(trust, "Source")
         reasons.append(trust_name + f" +{trust_bonus}")
+    elif trust_bonus < 0:
+        reasons.append(f"Découverte {trust_bonus}")
 
-    for tag in [event, region, *sectors]:
-        bonus = PERSONAL_BOOSTS.get(tag, 0)
-        if bonus:
-            score += bonus
-            reasons.append(f"{tag} +{bonus}")
+    event_bonus = {"Levée": 17, "Acquisition": 15, "Expansion": 12, "Partenariat": 10, "Croissance": 11, "Lancement": 8, "Business": 0}.get(event, 0)
+    if event_bonus:
+        score += event_bonus
+        reasons.append(f"{event} +{event_bonus}")
+
+    region_bonus = {"France": 8, "Europe": 4}.get(region, 0)
+    if region_bonus:
+        score += region_bonus
+        reasons.append(f"{region} +{region_bonus}")
+
+    sector_bonus_map = {"SaaS": 4, "IA": 2, "Sales": 3, "Fintech": 3, "Deeptech": 4, "Cyber": 3, "Climat": 3, "Healthtech": 3}
+    sector_bonus = sum(sector_bonus_map.get(s, 0) for s in sectors[:2])
+    if sector_bonus:
+        score += sector_bonus
+        reasons.append(f"Secteur pertinent +{sector_bonus}")
+
+    entrepreneurship_delta, entrepreneurship_reasons = entrepreneurship_adjustment(title, summary, event)
+    score += entrepreneurship_delta
+    reasons.extend(entrepreneurship_reasons)
 
     hours = age_hours(published_at)
     if hours <= 6:
-        score += 10; reasons.append("Très récent +10")
+        score += 8; reasons.append("Très récent +8")
     elif hours <= 24:
-        score += 7; reasons.append("Récent +7")
+        score += 5; reasons.append("Récent +5")
     elif hours <= 72:
-        score += 4; reasons.append("Moins de 3 jours +4")
+        score += 3; reasons.append("Moins de 3 jours +3")
     elif hours > 24 * 14:
-        score -= 8; reasons.append("Ancien −8")
+        score -= 7; reasons.append("Ancien −7")
 
+    # Community popularity can help surface a discovery, but no longer overwhelms business value.
     if points:
-        bonus = min(points // 20, 10); score += bonus
+        bonus = min(points // 35, 5); score += bonus
         if bonus: reasons.append(f"Traction communauté +{bonus}")
     if comments:
-        bonus = min(comments // 20, 6); score += bonus
+        bonus = min(comments // 40, 3); score += bonus
         if bonus: reasons.append(f"Discussion active +{bonus}")
 
-    return max(1, min(score, 99)), reasons[:7]
+    return max(1, min(score, 99)), reasons[:9]
 
 
 def interest_label(score: int) -> str:
@@ -498,7 +607,7 @@ def make_item(*, title: str, summary: str, url: str, source: str, published_at: 
     if should_exclude(title, source_summary, source, event):
         return None
 
-    score, score_reasons = score_item(source_weight, trust, event, sectors, region, published_at, points, comments)
+    score, score_reasons = score_item(source_weight, trust, event, sectors, region, published_at, points, comments, title, source_summary)
     categories = list(dict.fromkeys([event, *sectors, *([region] if region in {"France", "Europe"} else [])]))[:5]
 
     return {
@@ -518,6 +627,7 @@ def make_item(*, title: str, summary: str, url: str, source: str, published_at: 
         "score": score,
         "score_reasons": score_reasons,
         "interest": interest_label(score),
+        "entrepreneurship_priority": score,
         "domain": display_domain,
         "metrics": {"points": points, "comments": comments} if points or comments else {},
         "trust": trust,
@@ -880,6 +990,7 @@ def cluster_and_dedupe(items: Iterable[dict]) -> list[dict]:
             primary["score_reasons"] = ["Divergence détectée −12", *primary.get("score_reasons", [])][:7]
 
         primary["interest"] = interest_label(primary["score"])
+        primary["entrepreneurship_priority"] = primary["score"]
         out.append(primary)
 
     # Keep the feed focused: trusted sources first, then discovery; very old
@@ -979,7 +1090,7 @@ def main() -> int:
         items = cluster_and_dedupe(items)
 
     payload = {
-        "version": "2.5",
+        "version": "2.6",
         "strict_link_mode": True,
         "direct_sources_only": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
