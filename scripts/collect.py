@@ -19,10 +19,10 @@ from urllib.parse import urlparse, urljoin
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.6 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.7 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
-# V2.6: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
+# V2.7: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
 # founder website links in the trusted feed.
 RSS_SOURCES = [
     {
@@ -223,7 +223,7 @@ PERSONAL_BOOSTS = {
     "Partenariat": 10, "Croissance": 11, "SaaS": 5, "IA": 3, "Sales": 4, "Fintech": 4, "Deeptech": 4,
 }
 
-# V2.6: the score is deliberately entrepreneurship-first. Product features from very large platforms
+# V2.7: the score remains entrepreneurship-first. Product features from very large platforms
 # remain visible, but they should not outrank fundraising, launches, expansion, M&A or hard traction signals.
 LOW_VALUE_PATTERNS = [
     r"\bnew feature\b", r"\badds? (?:a |an )?(?:new )?feature\b", r"\bnow lets? users\b",
@@ -400,19 +400,62 @@ def looks_french(text: str) -> bool:
 def extract_subject(title: str) -> str:
     t = re.sub(r"^Show HN:\s*", "", clean_text(title), flags=re.I)
     separators = [
-        r"\s+(?:raises?|raised|secures?|secured|closes?|closed)\s+",
+        r"\s+(?:raises?|raised|secures?|secured|closes?|closed|bags?|lands?)\s+",
         r"\s+(?:acquires?|acquired|buys?|bought)\s+",
         r"\s+(?:launches?|launched|unveils?|unveiled|introduces?)\s+",
-        r"\s+(?:l[èe]ve|rach[èe]te|lance|d[ée]voile|annonce)\s+",
-        r"\s+hits?\s+",
-        r"\s+reaches?\s+",
+        r"\s+(?:l[èe]ve|boucle|rach[èe]te|lance|d[ée]voile|annonce)\s+",
+        r"\s+hits?\s+", r"\s+reaches?\s+", r"\s+valued at\s+",
     ]
     for sep in separators:
         parts = re.split(sep, t, maxsplit=1, flags=re.I)
-        if len(parts) > 1 and 1 <= len(parts[0].split()) <= 8:
+        if len(parts) > 1 and 1 <= len(parts[0].split()) <= 10:
             return parts[0].strip(" :-–—")
     return " ".join(t.split()[:6]).strip(" :-–—")
 
+
+COUNTRY_POSSESSIVES = {
+    "france", "french", "germany", "german", "spain", "spanish", "italy", "italian",
+    "norway", "norwegian", "sweden", "swedish", "finland", "finnish", "denmark", "danish",
+    "uk", "britain", "british", "europe", "european", "belgium", "belgian", "netherlands", "dutch",
+}
+GENERIC_ENTITY_PREFIXES = [
+    r"^(?:french|german|spanish|italian|british|european|norwegian|swedish|finnish|danish|belgian|dutch)\s+",
+    r"^(?:ai|ia|fintech|deeptech|healthtech|climate|cyber|saas|b2b)\s+",
+    r"^(?:startup|start-up|scale-up|scaleup|company|entreprise|soci[ée]t[ée])\s+",
+]
+GENERIC_ENTITY_WORDS = {
+    "the", "this", "new", "how", "why", "what", "sans", "avec", "pour", "from", "inside",
+    "startup", "start-up", "company", "business", "french", "european", "europe", "france",
+}
+
+
+def company_identity(title: str) -> str:
+    subject = clean_text(extract_subject(title)).strip(" :-–—")
+    # Headlines such as “Norway’s Birdsview raises …” should track Birdsview, not the country label.
+    m = re.match(r"^([A-Za-zÀ-ÿ0-9.+-]+)[’']s\s+(.+)$", subject)
+    if m and m.group(1).lower() in COUNTRY_POSSESSIVES:
+        subject = m.group(2).strip()
+    elif m and re.match(r"^(?:new|latest|next|first)\b", m.group(2), flags=re.I):
+        # “Spotify’s new feature …” still identifies Spotify as the company, even if the article is low priority.
+        subject = m.group(1).strip()
+    # Remove editorial descriptors while preserving the actual company name.
+    changed = True
+    while changed:
+        changed = False
+        for pattern in GENERIC_ENTITY_PREFIXES:
+            cleaned = re.sub(pattern, "", subject, count=1, flags=re.I).strip()
+            if cleaned != subject and cleaned:
+                subject = cleaned
+                changed = True
+    words = subject.split()
+    if not words or len(words) > 8:
+        return ""
+    if words[0].lower().strip(".,:;!?()[]{}") in GENERIC_ENTITY_WORDS:
+        return ""
+    # Do not turn a generic sentence fragment into a fake company history.
+    if len(words) >= 5 and not any(ch.isupper() for ch in "".join(words[1:])):
+        return ""
+    return subject.strip(" :-–—")
 
 def extract_amount(text: str) -> str | None:
     m = re.search(r"(?:[$€£]\s?\d+(?:[.,]\d+)?\s?(?:[kmb]|bn|million|billion)?|\d+(?:[.,]\d+)?\s?(?:million|millions|milliard|milliards)\s?(?:d['’]euros|euros|€|dollars?)?)", text, flags=re.I)
@@ -609,11 +652,15 @@ def make_item(*, title: str, summary: str, url: str, source: str, published_at: 
 
     score, score_reasons = score_item(source_weight, trust, event, sectors, region, published_at, points, comments, title, source_summary)
     categories = list(dict.fromkeys([event, *sectors, *([region] if region in {"France", "Europe"} else [])]))[:5]
+    company = company_identity(title)
 
     return {
         "id": item_id(url, title),
         "title": title,
         "entity": extract_subject(title),
+        "company": company,
+        "company_key": normalize_entity(company) if company else "",
+        "signal_key": signal_identity(normalize_entity(company) if company else "", event, title, source_summary, published_at),
         "summary": french_digest(title, source_summary, event, source, sectors, region),
         "source_excerpt": source_summary if source_summary and source_summary != french_digest(title, source_summary, event, source, sectors, region) else "",
         "why": why_interesting(event, sectors, region),
@@ -835,7 +882,7 @@ def normalize_entity(value: str) -> str:
 
 
 def entity_tokens(item: dict) -> set[str]:
-    subject = item.get("entity") or extract_subject(item.get("title", ""))
+    subject = item.get("company") or item.get("entity") or extract_subject(item.get("title", ""))
     return normalized_tokens(normalize_entity(subject))
 
 
@@ -873,6 +920,23 @@ def event_amount(text: str, event: str) -> str | None:
     return None
 
 
+
+def signal_identity(company_key: str, event: str, title: str, summary: str, published_at: str) -> str:
+    if not company_key:
+        return item_id("signal", title)
+    amount = event_amount(f"{title} {summary}", event)
+    try:
+        dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        week = f"{dt.isocalendar().year}-W{dt.isocalendar().week:02d}"
+    except Exception:
+        week = "unknown"
+    if amount:
+        basis = f"{company_key}|{event}|{amount}"
+    else:
+        keywords = sorted(normalized_tokens(title))[:5]
+        basis = f"{company_key}|{event}|{week}|{'-'.join(keywords)}"
+    return hashlib.sha1(basis.encode("utf-8")).hexdigest()[:14]
+
 def same_signal(a: dict, b: dict) -> bool:
     if a["source"] == b["source"]:
         return False
@@ -890,13 +954,20 @@ def same_signal(a: dict, b: dict) -> bool:
     jaccard = len(inter) / max(1, len(union))
     seq = SequenceMatcher(None, re.sub(r"\W+", " ", a["title"].lower()), re.sub(r"\W+", " ", b["title"].lower())).ratio()
     shared_entity = ea & eb
+    company_a = a.get("company_key") or normalize_entity(a.get("company") or "")
+    company_b = b.get("company_key") or normalize_entity(b.get("company") or "")
+    exact_company = bool(company_a and company_b and company_a == company_b)
     amount_a = event_amount(f"{a['title']} {a.get('source_excerpt','')}", a.get("event", "Business"))
     amount_b = event_amount(f"{b['title']} {b.get('source_excerpt','')}", b.get("event", "Business"))
     same_amount = bool(amount_a and amount_b and amount_a == amount_b)
     distinctive = any(len(tok) >= 5 for tok in inter)
 
-    # Deliberately conservative: confirmation is only created when the same
-    # company/entity is recognizable, or when title similarity is very high.
+    # V2.7: a recognized company name is strong evidence, but a funding round still needs
+    # an amount or meaningful headline overlap so two separate rounds are not merged.
+    if exact_company:
+        if a.get("event") == "Levée":
+            return same_amount or jaccard >= 0.22 or (distinctive and len(inter) >= 2)
+        return jaccard >= 0.20 or (distinctive and len(inter) >= 2) or seq >= 0.66
     if shared_entity and (jaccard >= 0.26 or same_amount or (distinctive and len(inter) >= 2)):
         return True
     if seq >= 0.76 and distinctive and len(inter) >= 2:
@@ -904,7 +975,6 @@ def same_signal(a: dict, b: dict) -> bool:
     if same_amount and distinctive and len(inter) >= 2:
         return True
     return False
-
 
 def detect_cluster_conflict(cluster: list[dict]) -> tuple[bool, str]:
     funding_amounts = {
@@ -978,6 +1048,9 @@ def cluster_and_dedupe(items: Iterable[dict]) -> list[dict]:
         primary["confidence_level"] = level
         primary["confidence_label"] = label
         primary["confidence_note"] = conflict_note or note
+        primary["signal_key"] = signal_identity(primary.get("company_key", ""), primary.get("event", "Business"), primary.get("title", ""), primary.get("source_excerpt", ""), primary.get("published_at", ""))
+        primary["trusted_confirmation_count"] = len({i["source"] for i in trusted_cluster})
+        primary["has_official_confirmation"] = any(i.get("trust") == "official" for i in trusted_cluster)
 
         if level == "confirmed":
             primary["score"] = min(99, primary["score"] + 9)
@@ -1090,7 +1163,7 @@ def main() -> int:
         items = cluster_and_dedupe(items)
 
     payload = {
-        "version": "2.6",
+        "version": "2.7",
         "strict_link_mode": True,
         "direct_sources_only": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
