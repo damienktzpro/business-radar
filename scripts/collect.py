@@ -19,10 +19,10 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.3 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.4 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
-# V2.3: direct publisher feeds only. No Google News redirector and no arbitrary
+# V2.4: direct publisher feeds only. No Google News redirector and no arbitrary
 # founder website links in the trusted feed.
 RSS_SOURCES = [
     {
@@ -746,6 +746,7 @@ def stats_for(items: list[dict]) -> dict:
         "sources_expected": SOURCE_HEALTH["expected"],
         "sources_failed": len(SOURCE_HEALTH["failed"]),
         "source_failures": SOURCE_HEALTH["failed"],
+        "source_empty": SOURCE_HEALTH["empty"],
         "france": sum(1 for i in items if i.get("region") == "France"),
         "verified": sum(1 for i in items if i.get("trust") in {"official", "reference", "editorial"}),
         "confirmed": sum(1 for i in items if i.get("confidence_level") in {"confirmed", "official_confirmed"}),
@@ -792,7 +793,7 @@ def main() -> int:
         items = cluster_and_dedupe(items)
 
     payload = {
-        "version": "2.3",
+        "version": "2.4",
         "strict_link_mode": True,
         "direct_sources_only": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
