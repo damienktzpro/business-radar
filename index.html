@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>Business Radar</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">VEILLE ENTREPRENEURIALE</p>
+      <h1>Business Radar</h1>
+      <p id="updated" class="updated">Chargement…</p>
+    </div>
+    <button id="refresh" class="refresh" type="button" aria-label="Actualiser">↻</button>
+  </header>
+
+  <main>
+    <section class="controls">
+      <div id="filters" class="filters"></div>
+      <label class="search-wrap">
+        <span>Rechercher</span>
+        <input id="search" type="search" placeholder="SaaS, IA, fintech…" />
+      </label>
+    </section>
+
+    <section class="hero">
+      <div>
+        <span class="live-dot"></span>
+        <span>RADAR ACTIF</span>
+      </div>
+      <strong id="counter">0 signaux</strong>
+    </section>
+
+    <section id="feed" class="feed" aria-live="polite"></section>
+    <p id="empty" class="empty" hidden>Aucun résultat avec ces filtres.</p>
+  </main>
+
+  <template id="card-template">
+    <article class="card">
+      <div class="card-top">
+        <div class="source-line">
+          <span class="source"></span>
+          <span class="age"></span>
+        </div>
+        <span class="score"></span>
+      </div>
+      <h2></h2>
+      <p class="summary"></p>
+      <div class="tags"></div>
+      <div class="metrics"></div>
+      <a class="read" target="_blank" rel="noopener noreferrer">Voir la source <span>↗</span></a>
+    </article>
+  </template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

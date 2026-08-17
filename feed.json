@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-08-17T20:49:45.956840+00:00",
+  "count": 3,
+  "errors": [],
+  "items": [
+    {
+      "id": "59535cbe86d426",
+      "title": "Un nouveau SaaS B2B automatise la prospection commerciale",
+      "summary": "Carte de démonstration pour valider l'interface du Business Radar.",
+      "url": "https://example.com/saas",
+      "source": "Démo",
+      "published_at": "2026-08-17T20:49:45.956739+00:00",
+      "categories": [
+        "SaaS",
+        "Startup"
+      ],
+      "score": 86,
+      "domain": "example.com"
+    },
+    {
+      "id": "93e40f0a3f9638",
+      "title": "Show HN: un fondateur lance un outil IA pour analyser des marchés",
+      "summary": "Projet fictif utilisé uniquement en mode démo.",
+      "url": "https://example.com/ai",
+      "source": "Show HN",
+      "published_at": "2026-08-17T20:49:45.956739+00:00",
+      "categories": [
+        "IA",
+        "Startup"
+      ],
+      "score": 79,
+      "domain": "example.com"
+    },
+    {
+      "id": "b04d55472ae468",
+      "title": "Une fintech française prépare un nouveau produit pour les PME",
+      "summary": "Exemple de contenu France / Fintech.",
+      "url": "https://example.com/fintech",
+      "source": "Démo",
+      "published_at": "2026-08-17T20:49:45.956739+00:00",
+      "categories": [
+        "France",
+        "Fintech"
+      ],
+      "score": 72,
+      "domain": "example.com"
+    }
+  ]
+}
