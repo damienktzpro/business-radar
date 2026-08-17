@@ -21,10 +21,10 @@
     <div class="brand-block">
       <div class="brand-line">
         <span class="brand-dot"></span>
-        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.6</p>
+        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.7</p>
       </div>
       <h1>Business Radar</h1>
-      <p class="tagline">Ce qui se crée, se finance et accélère — trié d’abord par valeur entrepreneuriale, avec des sources contrôlées.</p>
+      <p class="tagline">Ce qui se crée, se finance et accélère — avec confirmation renforcée et entreprises à surveiller.</p>
       <p id="updated" class="updated">Chargement…</p>
     </div>
 
@@ -68,6 +68,19 @@
         <div id="source-health" class="source-health" aria-label="État des sources"></div>
       </div>
       <div id="stats" class="stats" aria-label="Statistiques du radar"></div>
+    </section>
+
+
+    <section id="watch-section" class="watch-section" aria-label="Entreprises à surveiller">
+      <div class="section-heading">
+        <div>
+          <p class="results-kicker">MOMENTUM · 30 JOURS</p>
+          <h2>Entreprises à surveiller</h2>
+        </div>
+        <p class="watch-note">Le radar mémorise localement les apparitions distinctes, sans compte ni serveur.</p>
+      </div>
+      <div id="watchlist" class="watchlist"></div>
+      <p id="watch-empty" class="watch-empty" hidden>Le radar construit l’historique. Une entreprise apparaîtra ici après au moins 2 signaux distincts sur 30 jours.</p>
     </section>
 
     <section class="controls-panel">
@@ -124,6 +137,7 @@
 
       <h3></h3>
       <div class="tags"></div>
+      <div class="company-history-note" hidden></div>
 
       <div class="insight-grid">
         <div class="insight-block summary-block">

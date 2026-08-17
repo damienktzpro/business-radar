@@ -1,3 +1,13 @@
+function readStorageJson(keys, fallback) {
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+  }
+  return fallback;
+}
+
 const state = {
   items: [],
   view: "Pour toi",
@@ -5,8 +15,9 @@ const state = {
   confidence: "Fiables",
   query: "",
   stats: {},
-  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV26") || localStorage.getItem("businessRadarFavoritesV25") || localStorage.getItem("businessRadarFavoritesV24") || localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
-  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV26") || localStorage.getItem("businessRadarPreferencesV25") || localStorage.getItem("businessRadarPreferencesV24") || localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
+  favorites: new Set(readStorageJson(["businessRadarFavoritesV27", "businessRadarFavoritesV26", "businessRadarFavoritesV25", "businessRadarFavoritesV24", "businessRadarFavoritesV23", "businessRadarFavoritesV22"], [])),
+  preferences: readStorageJson(["businessRadarPreferencesV27", "businessRadarPreferencesV26", "businessRadarPreferencesV25", "businessRadarPreferencesV24", "businessRadarPreferencesV23", "businessRadarPreferencesV22"], {}),
+  companyHistory: readStorageJson(["businessRadarCompanyHistoryV27"], {}),
 };
 
 const SAFE_HOSTS = [
@@ -38,6 +49,9 @@ const briefText = document.querySelector("#brief-text");
 const briefHighlights = document.querySelector("#brief-highlights");
 const dailyTop = document.querySelector("#daily-top");
 const sourceHealth = document.querySelector("#source-health");
+const watchlist = document.querySelector("#watchlist");
+const watchEmpty = document.querySelector("#watch-empty");
+const watchSection = document.querySelector("#watch-section");
 const themeButtons = [...document.querySelectorAll("[data-theme-choice]")];
 const themeColor = document.querySelector('meta[name="theme-color"]');
 
@@ -47,6 +61,143 @@ function timeAgo(iso) {
   if (seconds < 3600) return `il y a ${Math.floor(seconds / 60)} min`;
   if (seconds < 86400) return `il y a ${Math.floor(seconds / 3600)} h`;
   return `il y a ${Math.floor(seconds / 86400)} j`;
+}
+
+const HISTORY_DAYS = 45;
+const WATCH_DAYS = 30;
+const INSTITUTION_KEYS = new Set([
+  "bpifrance", "la french tech", "french tech", "european innovation council", "eic",
+  "spotify", "apple", "google", "microsoft", "meta", "amazon", "netflix", "tiktok", "youtube", "snap", "snapchat"
+]);
+
+function normalizedCompanyKey(item) {
+  const raw = String(item.company_key || item.company || "").trim().toLowerCase();
+  return raw.replace(/[^a-zà-ÿ0-9+.-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function historySignalsFor(itemOrKey, days = WATCH_DAYS) {
+  const key = typeof itemOrKey === "string" ? itemOrKey : normalizedCompanyKey(itemOrKey);
+  const entry = state.companyHistory[key];
+  if (!entry || !Array.isArray(entry.signals)) return [];
+  const cutoff = Date.now() - days * 86400000;
+  return entry.signals.filter(signal => new Date(signal.published_at || signal.seen_at || 0).getTime() >= cutoff);
+}
+
+function ingestCompanyHistory(items) {
+  const cutoff = Date.now() - HISTORY_DAYS * 86400000;
+  const next = {};
+
+  // Keep only recent, previously recorded history.
+  Object.entries(state.companyHistory || {}).forEach(([key, entry]) => {
+    const signals = Array.isArray(entry?.signals) ? entry.signals.filter(signal => new Date(signal.published_at || signal.seen_at || 0).getTime() >= cutoff) : [];
+    if (signals.length) next[key] = { name: entry.name || key, signals };
+  });
+
+  items.filter(isVerified).forEach(item => {
+    const key = normalizedCompanyKey(item);
+    if (!key || key.length < 2 || INSTITUTION_KEYS.has(key)) return;
+    const published = new Date(item.published_at || 0).getTime();
+    if (!Number.isFinite(published) || published < cutoff) return;
+    const signalKey = item.signal_key || item.id;
+    if (!signalKey) return;
+    if (!next[key]) next[key] = { name: item.company || item.entity || key, signals: [] };
+    const compact = {
+      signal_key: signalKey,
+      id: item.id,
+      title: item.title,
+      event: item.event || "Business",
+      source: item.source,
+      published_at: item.published_at,
+      score: item.score || 0,
+      confidence_level: item.confidence_level || "selected",
+      region: item.region || "International",
+    };
+    const existingIndex = next[key].signals.findIndex(signal => signal.signal_key === signalKey);
+    if (existingIndex >= 0) next[key].signals[existingIndex] = compact;
+    else next[key].signals.push(compact);
+    next[key].name = item.company || next[key].name || item.entity || key;
+  });
+
+  // Limit storage so the radar remains lightweight on mobile browsers.
+  const compactEntries = Object.entries(next)
+    .map(([key, entry]) => {
+      entry.signals.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+      entry.signals = entry.signals.slice(0, 20);
+      return [key, entry];
+    })
+    .sort((a, b) => new Date(b[1].signals[0]?.published_at || 0) - new Date(a[1].signals[0]?.published_at || 0))
+    .slice(0, 80);
+  state.companyHistory = Object.fromEntries(compactEntries);
+  saveCompanyHistory();
+}
+
+function companyMomentumEntries() {
+  return Object.entries(state.companyHistory || {}).map(([key, entry]) => {
+    const signals = historySignalsFor(key, WATCH_DAYS);
+    const events = [...new Set(signals.map(s => s.event).filter(e => e && e !== "Business"))];
+    const confirmed = signals.filter(s => ["confirmed", "official_confirmed"].includes(s.confidence_level)).length;
+    const score = signals.length * 24 + events.length * 7 + confirmed * 10 + Math.max(0, ...signals.map(s => Number(s.score || 0))) / 4;
+    const current = state.items
+      .filter(item => normalizedCompanyKey(item) === key)
+      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))[0] || null;
+    return { key, name: entry.name || key, signals, events, confirmed, score, current };
+  }).filter(entry => entry.signals.length >= 2)
+    .sort((a, b) => b.score - a.score || new Date(b.signals[0].published_at) - new Date(a.signals[0].published_at))
+    .slice(0, 6);
+}
+
+function jumpToSignal(id) {
+  if (!id) return;
+  const findAndScroll = () => {
+    const target = [...feed.querySelectorAll(".card")].find(card => card.dataset.itemId === id);
+    if (!target) return false;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("pulse-card");
+    setTimeout(() => target.classList.remove("pulse-card"), 1200);
+    return true;
+  };
+  if (findAndScroll()) return;
+  state.view = "Pour toi";
+  state.category = "Tout";
+  state.confidence = "Fiables";
+  state.query = "";
+  search.value = "";
+  renderTabs(); renderFilters(); renderConfidenceFilters(); render();
+  requestAnimationFrame(findAndScroll);
+}
+
+function renderWatchlist() {
+  if (!watchlist || !watchEmpty) return;
+  const entries = companyMomentumEntries();
+  watchEmpty.hidden = entries.length > 0;
+  watchlist.innerHTML = entries.map(entry => {
+    const latest = entry.signals[0];
+    const count = entry.signals.length;
+    const events = entry.events.slice(0, 4);
+    return `
+      <article class="watch-card">
+        <div class="watch-card-top">
+          <h3 class="watch-company">${escapeHtml(entry.name)}</h3>
+          <span class="watch-count">${count} signaux</span>
+        </div>
+        <p class="watch-meta">Dernière apparition ${escapeHtml(timeAgo(latest.published_at))}${entry.confirmed ? ` · ${entry.confirmed} recoupé${entry.confirmed > 1 ? "s" : ""}` : ""}</p>
+        <div class="watch-events">${events.map(event => `<span class="watch-event">${escapeHtml(event)}</span>`).join("")}</div>
+        ${entry.current ? `<button type="button" class="watch-latest" data-watch-signal="${escapeAttr(entry.current.id)}">Voir le dernier signal ↓</button>` : ""}
+      </article>`;
+  }).join("");
+  watchlist.querySelectorAll("[data-watch-signal]").forEach(button => button.addEventListener("click", () => jumpToSignal(button.dataset.watchSignal)));
+}
+
+function dailyReason(item) {
+  const reasons = [];
+  if (item.event && item.event !== "Business") reasons.push(item.event);
+  if (["official_confirmed", "confirmed"].includes(item.confidence_level)) reasons.push(`${item.trusted_confirmation_count || item.confirmation_count || 2} sources convergentes`);
+  else if (item.confidence_level === "official") reasons.push("source officielle");
+  const appearances = historySignalsFor(item, WATCH_DAYS).length;
+  if (appearances >= 2) reasons.push(`${appearances} apparitions en 30 j`);
+  if (item.region === "France") reasons.push("France");
+  else if (item.region === "Europe") reasons.push("Europe");
+  return reasons.slice(0, 3).join(" · ") || "signal entrepreneurial prioritaire";
 }
 
 function hostnameAllowed(hostname) {
@@ -66,8 +217,12 @@ function isSafeBrowserLink(rawUrl) {
 }
 
 function savePersonalization() {
-  localStorage.setItem("businessRadarFavoritesV26", JSON.stringify([...state.favorites]));
-  localStorage.setItem("businessRadarPreferencesV26", JSON.stringify(state.preferences));
+  localStorage.setItem("businessRadarFavoritesV27", JSON.stringify([...state.favorites]));
+  localStorage.setItem("businessRadarPreferencesV27", JSON.stringify(state.preferences));
+}
+
+function saveCompanyHistory() {
+  try { localStorage.setItem("businessRadarCompanyHistoryV27", JSON.stringify(state.companyHistory)); } catch (_) {}
 }
 
 function personalizationTags(item) {
@@ -154,6 +309,8 @@ function dailyPriority(item) {
   if (item.region === "France") value += 6;
   else if (item.region === "Europe") value += 3;
   if (["Levée", "Acquisition", "Expansion", "Croissance", "Partenariat"].includes(item.event)) value += 7;
+  const appearances = historySignalsFor(item, WATCH_DAYS).length;
+  if (appearances >= 2) value += Math.min(16, (appearances - 1) * 6);
   return value;
 }
 
@@ -234,7 +391,7 @@ function renderDailyBrief() {
   briefText.textContent = `${base.length} signal${base.length > 1 ? "aux" : ""} fiable${base.length > 1 ? "s" : ""} ${windowLabel}` +
     (sector ? ` · ${sector[0]} est le secteur le plus présent.` : ".");
 
-  // Top 3 V2.6: valeur entrepreneuriale + fiabilité + diversité des éditeurs.
+  // Top 3 V2.7: valeur entrepreneuriale + fiabilité + diversité + historique de l’entreprise.
   const top = pickDailyTop(base, 3);
 
   dailyTop.innerHTML = top.map((item, index) => `
@@ -243,31 +400,14 @@ function renderDailyBrief() {
       <div>
         <strong>${escapeHtml(item.title)}</strong>
         <small>${escapeHtml(item.source)} · ${escapeHtml(item.confidence_label || "Source sélectionnée")}</small>
+        <span class="daily-reason">Pourquoi : ${escapeHtml(dailyReason(item))}</span>
       </div>
       <span class="daily-jump" aria-hidden="true">↓</span>
     </button>
   `).join("");
 
   dailyTop.querySelectorAll("[data-jump-id]").forEach(button => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.jumpId;
-      const target = [...feed.querySelectorAll(".card")].find(card => card.dataset.itemId === id);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
-        target.classList.add("pulse-card");
-        setTimeout(() => target.classList.remove("pulse-card"), 1200);
-      } else {
-        // The card may be hidden by the current view/filter: return to the trusted feed and render it.
-        state.view = "Pour toi";
-        state.category = "Tout";
-        state.confidence = "Fiables";
-        renderTabs(); renderFilters(); renderConfidenceFilters(); render();
-        requestAnimationFrame(() => {
-          const retry = [...feed.querySelectorAll(".card")].find(card => card.dataset.itemId === id);
-          if (retry) retry.scrollIntoView({ behavior: "smooth", block: "center" });
-        });
-      }
-    });
+    button.addEventListener("click", () => jumpToSignal(button.dataset.jumpId));
   });
 
   const chips = [
@@ -385,6 +525,13 @@ function render() {
     (item.sectors || []).forEach(tag => primaryTags.push(tag));
     node.querySelector(".tags").innerHTML = [...new Set(primaryTags)].slice(0, 5).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join("");
 
+    const historyNote = node.querySelector(".company-history-note");
+    const appearances = historySignalsFor(item, WATCH_DAYS).length;
+    if (historyNote && appearances >= 2) {
+      historyNote.hidden = false;
+      historyNote.textContent = `↗ ${appearances}e apparition en 30 jours · entreprise à surveiller`;
+    }
+
     const reasons = node.querySelector(".score-reasons");
     reasons.innerHTML = (item.score_reasons || []).map(reason => `<span>${escapeHtml(reason)}</span>`).join("") || "<span>Score calculé selon la source, la fraîcheur et le signal business.</span>";
 
@@ -464,12 +611,14 @@ async function load() {
     const data = await response.json();
     state.items = data.items || [];
     state.stats = data.stats || {};
-    updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · sources directes uniquement · automatique toutes les 6 h`;
+    ingestCompanyHistory(state.items);
+    updated.textContent = `Mis à jour ${timeAgo(data.generated_at)} · sources directes uniquement · historique local 45 j · automatique toutes les 6 h`;
     renderStats();
     renderFilters();
     renderConfidenceFilters();
     renderTabs();
     render();
+    renderWatchlist();
   } catch (error) {
     updated.textContent = "Impossible de charger le radar";
     feed.innerHTML = `<p class="empty">Erreur : ${escapeHtml(error.message)}</p>`;
