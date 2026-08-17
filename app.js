@@ -5,13 +5,15 @@ const state = {
   confidence: "Fiables",
   query: "",
   stats: {},
-  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV24") || localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
-  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV24") || localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
+  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV25") || localStorage.getItem("businessRadarFavoritesV24") || localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
+  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV25") || localStorage.getItem("businessRadarPreferencesV24") || localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
 };
 
 const SAFE_HOSTS = [
   "presse.bpifrance.fr",
   "bpifrance.fr",
+  "lafrenchtech.gouv.fr",
+  "eic.ec.europa.eu",
   "maddyness.com",
   "frenchweb.fr",
   "sifted.eu",
@@ -34,6 +36,7 @@ const template = document.querySelector("#card-template");
 const stats = document.querySelector("#stats");
 const briefText = document.querySelector("#brief-text");
 const briefHighlights = document.querySelector("#brief-highlights");
+const dailyTop = document.querySelector("#daily-top");
 const sourceHealth = document.querySelector("#source-health");
 const themeButtons = [...document.querySelectorAll("[data-theme-choice]")];
 const themeColor = document.querySelector('meta[name="theme-color"]');
@@ -63,8 +66,8 @@ function isSafeBrowserLink(rawUrl) {
 }
 
 function savePersonalization() {
-  localStorage.setItem("businessRadarFavoritesV24", JSON.stringify([...state.favorites]));
-  localStorage.setItem("businessRadarPreferencesV24", JSON.stringify(state.preferences));
+  localStorage.setItem("businessRadarFavoritesV25", JSON.stringify([...state.favorites]));
+  localStorage.setItem("businessRadarPreferencesV25", JSON.stringify(state.preferences));
 }
 
 function personalizationTags(item) {
@@ -178,11 +181,13 @@ function renderDailyBrief() {
   const acquisitions = base.filter(i => i.event === "Acquisition").length;
   const france = base.filter(i => i.region === "France").length;
   const confirmed = base.filter(i => ["confirmed", "official_confirmed"].includes(i.confidence_level)).length;
+  const official = base.filter(i => ["official", "official_confirmed"].includes(i.confidence_level)).length;
   const sector = topSector(base);
 
   if (!base.length) {
     briefText.textContent = "Aucun signal fiable récent n’est disponible pour le moment.";
     briefHighlights.innerHTML = "";
+    dailyTop.innerHTML = "";
     return;
   }
 
@@ -190,17 +195,37 @@ function renderDailyBrief() {
   briefText.textContent = `${base.length} signal${base.length > 1 ? "aux" : ""} fiable${base.length > 1 ? "s" : ""} ${windowLabel}` +
     (sector ? ` · ${sector[0]} est le secteur le plus présent.` : ".");
 
+  // Top 3: privilégie les signaux recoupés / officiels, puis le score.
+  const top = [...base]
+    .filter(item => item.confidence_level !== "conflict")
+    .sort((a, b) => {
+      const trustA = ["official_confirmed", "official"].includes(a.confidence_level) ? 30 : a.confidence_level === "confirmed" ? 20 : 0;
+      const trustB = ["official_confirmed", "official"].includes(b.confidence_level) ? 30 : b.confidence_level === "confirmed" ? 20 : 0;
+      return ((b.score || 0) + trustB) - ((a.score || 0) + trustA);
+    })
+    .slice(0, 3);
+
+  dailyTop.innerHTML = top.map((item, index) => `
+    <div class="daily-top-item">
+      <span class="daily-rank">${index + 1}</span>
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml(item.source)} · ${escapeHtml(item.confidence_label || "Source sélectionnée")}</small>
+      </div>
+    </div>
+  `).join("");
+
   const chips = [
     raises ? [raises, "levée" + (raises > 1 ? "s" : "")] : null,
     launches ? [launches, "lancement" + (launches > 1 ? "s" : "")] : null,
     acquisitions ? [acquisitions, "M&A"] : null,
     france ? [france, "France"] : null,
     confirmed ? [confirmed, "recoupé" + (confirmed > 1 ? "s" : "")] : null,
+    official ? [official, "officiel" + (official > 1 ? "s" : "")] : null,
     sector ? [sector[1], sector[0]] : null,
-  ].filter(Boolean).slice(0, 5);
+  ].filter(Boolean).slice(0, 6);
   briefHighlights.innerHTML = chips.map(([value, label]) => `<span class="brief-chip"><strong>${value}</strong>${escapeHtml(label)}</span>`).join("");
 }
-
 function renderStats() {
   const s = state.stats || {};
   const active = Number(s.sources_active || s.sources || 0);
