@@ -15,14 +15,14 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.4 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.5 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
-# V2.4: direct publisher feeds only. No Google News redirector and no arbitrary
+# V2.5: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
 # founder website links in the trusted feed.
 RSS_SOURCES = [
     {
@@ -36,6 +36,10 @@ RSS_SOURCES = [
         "source_type": "official",
         "safe_domains": ["presse.bpifrance.fr", "bpifrance.fr"],
         "display_domain": "presse.bpifrance.fr",
+        "max_age_days": 45,
+        "fallback_listing_url": "https://presse.bpifrance.fr/?lang=fra",
+        "fallback_link_pattern": r"^/",
+        "fallback_max": 20,
     },
     {
         "name": "Maddyness",
@@ -112,6 +116,38 @@ RSS_SOURCES = [
     },
 ]
 
+
+HTML_SOURCES = [
+    {
+        "name": "La French Tech",
+        "listing_url": "https://lafrenchtech.gouv.fr/fr/actualites/",
+        "link_pattern": r"^/fr/actualites/(?!page/)[^?#]+/?$",
+        "weight": 24,
+        "region": "France",
+        "max": 14,
+        "max_age_days": 45,
+        "trust": "official",
+        "trust_label": "Source officielle",
+        "source_type": "official",
+        "safe_domains": ["lafrenchtech.gouv.fr"],
+        "display_domain": "lafrenchtech.gouv.fr",
+    },
+    {
+        "name": "European Innovation Council",
+        "listing_url": "https://eic.ec.europa.eu/european-innovation-council_en",
+        "link_pattern": r"^/news/[^?#]+(?:_en)?$",
+        "weight": 24,
+        "region": "Europe",
+        "max": 14,
+        "max_age_days": 45,
+        "trust": "official",
+        "trust_label": "Source officielle UE",
+        "source_type": "official",
+        "safe_domains": ["eic.ec.europa.eu"],
+        "display_domain": "eic.ec.europa.eu",
+    },
+]
+
 HN_ENDPOINTS = [
     {
         "name": "Show HN",
@@ -178,7 +214,7 @@ STOPWORDS = {
     "announces", "annonce", "lance", "levee", "levée", "million", "millions", "billion", "series", "seed", "new", "nouveau",
 }
 METRICS = {"links_checked": 0, "links_blocked": 0}
-SOURCE_HEALTH = {"expected": len(RSS_SOURCES) + len(HN_ENDPOINTS), "success": 0, "failed": [], "empty": []}
+SOURCE_HEALTH = {"expected": len(RSS_SOURCES) + len(HTML_SOURCES) + len(HN_ENDPOINTS), "success": 0, "failed": [], "empty": []}
 
 
 def http_get(url: str, timeout: int = 25) -> bytes:
@@ -442,13 +478,13 @@ def first_text(node: ET.Element, names: list[str]) -> str:
 def make_item(*, title: str, summary: str, url: str, source: str, published_at: str, source_weight: int,
               trust: str, trust_label: str, source_type: str, safe_domains: list[str], display_domain: str,
               default_region: str | None = None, default_event: str | None = None, points: int = 0,
-              comments: int = 0) -> dict | None:
+              comments: int = 0, max_age_days: int = 21) -> dict | None:
     title = clean_text(title)
     source_summary = short_text(summary, 320)
     if not title or not url:
         return None
     # Business Radar is a current-awareness tool: ignore stale feed entries.
-    if age_hours(published_at) > 24 * 21:
+    if age_hours(published_at) > 24 * max_age_days:
         return None
     METRICS["links_checked"] += 1
     if not is_safe_url(url, safe_domains):
@@ -524,9 +560,132 @@ def fetch_rss(source: dict) -> list[dict]:
             source_weight=source["weight"], trust=source["trust"], trust_label=source["trust_label"],
             source_type=source["source_type"], safe_domains=source["safe_domains"], display_domain=source["display_domain"],
             default_region=source.get("region"), default_event=source.get("default_event"),
+            max_age_days=int(source.get("max_age_days", 21)),
         )
         if item: items.append(item)
     return items
+
+
+
+def decode_html(raw: bytes) -> str:
+    for encoding in ("utf-8", "utf-8-sig", "iso-8859-1"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+def meta_content(doc: str, key: str) -> str:
+    key_re = re.escape(key)
+    patterns = [
+        rf'<meta[^>]+(?:property|name)=["\']{key_re}["\'][^>]+content=["\']([^"\']+)["\']',
+        rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']{key_re}["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, doc, flags=re.I | re.S)
+        if match:
+            return clean_text(match.group(1))
+    return ""
+
+
+def article_date(doc: str) -> str | None:
+    for key in ("article:published_time", "date", "datePublished", "publish-date"):
+        value = meta_content(doc, key)
+        if value:
+            return value
+    match = re.search(r'<time[^>]+datetime=["\']([^"\']+)["\']', doc, flags=re.I | re.S)
+    if match:
+        return clean_text(match.group(1))
+    match = re.search(r'"datePublished"\s*:\s*"([^"]+)"', doc, flags=re.I)
+    if match:
+        return clean_text(match.group(1))
+    return None
+
+
+def page_title(doc: str) -> str:
+    value = meta_content(doc, "og:title") or meta_content(doc, "twitter:title")
+    if value:
+        return value
+    match = re.search(r'<title[^>]*>(.*?)</title>', doc, flags=re.I | re.S)
+    return clean_text(match.group(1)) if match else ""
+
+
+def page_description(doc: str) -> str:
+    return (
+        meta_content(doc, "og:description")
+        or meta_content(doc, "description")
+        or meta_content(doc, "twitter:description")
+    )
+
+
+def listing_candidates(spec: dict) -> list[str]:
+    listing = decode_html(http_get(spec["listing_url"]))
+    hrefs = re.findall(r'href=["\']([^"\']+)["\']', listing, flags=re.I)
+    out: list[str] = []
+    seen = set()
+    pattern = spec.get("link_pattern")
+    for href in hrefs:
+        absolute = urljoin(spec["listing_url"], html.unescape(href)).split("#", 1)[0]
+        parsed = urlparse(absolute)
+        if not parsed.hostname or not any(host_matches(parsed.hostname, domain) for domain in spec["safe_domains"]):
+            continue
+        if pattern and not re.search(pattern, parsed.path, flags=re.I):
+            continue
+        if absolute.rstrip("/") == spec["listing_url"].rstrip("/"):
+            continue
+        if absolute in seen:
+            continue
+        seen.add(absolute)
+        out.append(absolute)
+        if len(out) >= int(spec.get("max", 12)):
+            break
+    return out
+
+
+def fetch_html_source(spec: dict) -> list[dict]:
+    items = []
+    for url in listing_candidates(spec):
+        # Validate the destination before even requesting the article page.
+        if not is_safe_url(url, spec["safe_domains"]):
+            continue
+        try:
+            doc = decode_html(http_get(url, timeout=20))
+        except Exception:
+            continue
+        published_raw = article_date(doc)
+        # Do not guess dates for arbitrary listing/navigation pages.
+        if not published_raw:
+            continue
+        title = page_title(doc)
+        summary = page_description(doc)
+        item = make_item(
+            title=title, summary=summary, url=url, source=spec["name"], published_at=parse_date(published_raw),
+            source_weight=spec["weight"], trust=spec["trust"], trust_label=spec["trust_label"],
+            source_type=spec["source_type"], safe_domains=spec["safe_domains"], display_domain=spec["display_domain"],
+            default_region=spec.get("region"), default_event=spec.get("default_event"),
+            max_age_days=int(spec.get("max_age_days", 45)),
+        )
+        if item:
+            items.append(item)
+    return items
+
+
+def bpifrance_fallback_spec(source: dict) -> dict:
+    return {
+        "name": source["name"],
+        "listing_url": source["fallback_listing_url"],
+        "link_pattern": source.get("fallback_link_pattern", r"^/"),
+        "weight": source["weight"],
+        "region": source.get("region", "France"),
+        "max": source.get("fallback_max", 20),
+        "max_age_days": source.get("max_age_days", 45),
+        "trust": source["trust"],
+        "trust_label": source["trust_label"],
+        "source_type": source["source_type"],
+        "safe_domains": source["safe_domains"],
+        "display_domain": source["display_domain"],
+    }
 
 
 def fetch_hn(spec: dict) -> list[dict]:
@@ -776,9 +935,36 @@ def main() -> int:
                 if not fetched:
                     SOURCE_HEALTH["empty"].append(source["name"])
             except Exception as exc:
+                # Bpifrance's RSS endpoint is occasionally unavailable; use
+                # its official press listing as a same-domain fallback.
+                fallback_ok = False
+                if source.get("fallback_listing_url"):
+                    try:
+                        fetched = fetch_html_source(bpifrance_fallback_spec(source))
+                        items.extend(fetched)
+                        SOURCE_HEALTH["success"] += 1
+                        fallback_ok = True
+                        if not fetched:
+                            SOURCE_HEALTH["empty"].append(source["name"])
+                    except Exception as fallback_exc:
+                        errors.append(f"{source['name']} fallback: {fallback_exc}")
+                if not fallback_ok:
+                    message = f"{source['name']}: {exc}"
+                    errors.append(message)
+                    SOURCE_HEALTH["failed"].append(source["name"])
+
+        for source in HTML_SOURCES:
+            try:
+                fetched = fetch_html_source(source)
+                items.extend(fetched)
+                SOURCE_HEALTH["success"] += 1
+                if not fetched:
+                    SOURCE_HEALTH["empty"].append(source["name"])
+            except Exception as exc:
                 message = f"{source['name']}: {exc}"
                 errors.append(message)
                 SOURCE_HEALTH["failed"].append(source["name"])
+
         for spec in HN_ENDPOINTS:
             try:
                 fetched = fetch_hn(spec)
@@ -793,7 +979,7 @@ def main() -> int:
         items = cluster_and_dedupe(items)
 
     payload = {
-        "version": "2.4",
+        "version": "2.5",
         "strict_link_mode": True,
         "direct_sources_only": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
