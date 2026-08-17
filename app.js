@@ -5,8 +5,8 @@ const state = {
   confidence: "Fiables",
   query: "",
   stats: {},
-  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
-  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
+  favorites: new Set(JSON.parse(localStorage.getItem("businessRadarFavoritesV24") || localStorage.getItem("businessRadarFavoritesV23") || localStorage.getItem("businessRadarFavoritesV22") || "[]")),
+  preferences: JSON.parse(localStorage.getItem("businessRadarPreferencesV24") || localStorage.getItem("businessRadarPreferencesV23") || localStorage.getItem("businessRadarPreferencesV22") || "{}"),
 };
 
 const SAFE_HOSTS = [
@@ -33,6 +33,10 @@ const search = document.querySelector("#search");
 const template = document.querySelector("#card-template");
 const stats = document.querySelector("#stats");
 const briefText = document.querySelector("#brief-text");
+const briefHighlights = document.querySelector("#brief-highlights");
+const sourceHealth = document.querySelector("#source-health");
+const themeButtons = [...document.querySelectorAll("[data-theme-choice]")];
+const themeColor = document.querySelector('meta[name="theme-color"]');
 
 function timeAgo(iso) {
   const seconds = Math.max(1, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -59,8 +63,8 @@ function isSafeBrowserLink(rawUrl) {
 }
 
 function savePersonalization() {
-  localStorage.setItem("businessRadarFavoritesV23", JSON.stringify([...state.favorites]));
-  localStorage.setItem("businessRadarPreferencesV23", JSON.stringify(state.preferences));
+  localStorage.setItem("businessRadarFavoritesV24", JSON.stringify([...state.favorites]));
+  localStorage.setItem("businessRadarPreferencesV24", JSON.stringify(state.preferences));
 }
 
 function personalizationTags(item) {
@@ -151,8 +155,50 @@ function renderTabs() {
   });
 }
 
-function statCard(value, label, tone = "") {
-  return `<div class="stat-card ${tone}"><strong>${value}</strong><span>${label}</span></div>`;
+function statCard(value, label, tone = "", title = "") {
+  return `<div class="stat-card ${tone}"${title ? ` title="${escapeAttr(title)}"` : ""}><strong>${value}</strong><span>${label}</span></div>`;
+}
+
+function itemIsFresh(item, hours = 24) {
+  return (Date.now() - new Date(item.published_at).getTime()) <= hours * 3600 * 1000;
+}
+
+function topSector(items) {
+  const counts = new Map();
+  items.forEach(item => (item.sectors || []).forEach(sector => counts.set(sector, (counts.get(sector) || 0) + 1)));
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+}
+
+function renderDailyBrief() {
+  const trusted = state.items.filter(isVerified);
+  const fresh = trusted.filter(item => itemIsFresh(item, 24));
+  const base = fresh.length ? fresh : trusted.slice(0, 30);
+  const raises = base.filter(i => i.event === "Levée").length;
+  const launches = base.filter(i => i.event === "Lancement").length;
+  const acquisitions = base.filter(i => i.event === "Acquisition").length;
+  const france = base.filter(i => i.region === "France").length;
+  const confirmed = base.filter(i => ["confirmed", "official_confirmed"].includes(i.confidence_level)).length;
+  const sector = topSector(base);
+
+  if (!base.length) {
+    briefText.textContent = "Aucun signal fiable récent n’est disponible pour le moment.";
+    briefHighlights.innerHTML = "";
+    return;
+  }
+
+  const windowLabel = fresh.length ? "sur les dernières 24 h" : "parmi les signaux récents";
+  briefText.textContent = `${base.length} signal${base.length > 1 ? "aux" : ""} fiable${base.length > 1 ? "s" : ""} ${windowLabel}` +
+    (sector ? ` · ${sector[0]} est le secteur le plus présent.` : ".");
+
+  const chips = [
+    raises ? [raises, "levée" + (raises > 1 ? "s" : "")] : null,
+    launches ? [launches, "lancement" + (launches > 1 ? "s" : "")] : null,
+    acquisitions ? [acquisitions, "M&A"] : null,
+    france ? [france, "France"] : null,
+    confirmed ? [confirmed, "recoupé" + (confirmed > 1 ? "s" : "")] : null,
+    sector ? [sector[1], sector[0]] : null,
+  ].filter(Boolean).slice(0, 5);
+  briefHighlights.innerHTML = chips.map(([value, label]) => `<span class="brief-chip"><strong>${value}</strong>${escapeHtml(label)}</span>`).join("");
 }
 
 function renderStats() {
@@ -163,18 +209,26 @@ function renderStats() {
   const official = Number(s.official || 0);
   const blocked = Number(s.links_blocked || 0);
   const conflicts = Number(s.conflicts || 0);
+  const failedNames = Array.isArray(s.source_failures) ? s.source_failures : [];
+  const emptyNames = Array.isArray(s.source_empty) ? s.source_empty : [];
+
   stats.innerHTML = [
-    statCard(`${active}/${expected}`, "sources actives", active === expected ? "good" : "warn"),
-    statCard(confirmed, "multi-confirmés", confirmed ? "good" : ""),
-    statCard(official, "signaux officiels", official ? "official" : ""),
-    statCard(blocked, "liens bloqués", blocked ? "warn" : "good"),
+    statCard(`${active}/${expected}`, "sources actives", active === expected ? "good" : "warn", failedNames.length ? `Indisponible : ${failedNames.join(", ")}` : "Toutes les sources répondent"),
+    statCard(confirmed, "multi-confirmés", confirmed ? "good" : "", confirmed ? "Signaux recoupés par plusieurs sources sélectionnées" : "Aucun signal multi-confirmé actuellement"),
+    statCard(official, "signaux officiels", official ? "official" : "", "Signaux provenant directement d’une source officielle autorisée"),
+    statCard(blocked, "liens bloqués", blocked ? "warn" : "good", "Liens rejetés par le filtre de sécurité"),
   ].join("");
 
-  const failed = Number(s.sources_failed || 0);
   const checked = Number(s.links_checked || 0);
-  briefText.textContent = failed
-    ? `${confirmed} signal${confirmed > 1 ? "aux" : ""} confirmé${confirmed > 1 ? "s" : ""} · ${conflicts} divergence${conflicts > 1 ? "s" : ""} détectée${conflicts > 1 ? "s" : ""} · ${failed} source${failed > 1 ? "s" : ""} temporairement indisponible${failed > 1 ? "s" : ""}.`
-    : `${confirmed} signal${confirmed > 1 ? "aux" : ""} confirmé${confirmed > 1 ? "s" : ""} · ${official} signal${official > 1 ? "aux" : ""} officiel${official > 1 ? "s" : ""} · ${checked} liens contrôlés · aucune source en erreur.`;
+  const failed = failedNames.length || Number(s.sources_failed || 0);
+  sourceHealth.innerHTML = failed
+    ? failedNames.map(name => `<span class="health-chip warn">⚠ ${escapeHtml(name)} indisponible</span>`).join("") +
+      (emptyNames.length ? emptyNames.map(name => `<span class="health-chip">○ ${escapeHtml(name)} sans signal récent</span>`).join("") : "")
+    : `<span class="health-chip ok">✓ Toutes les sources répondent</span>${emptyNames.map(name => `<span class="health-chip">○ ${escapeHtml(name)} sans signal récent</span>`).join("")}`;
+
+  if (conflicts) sourceHealth.innerHTML += `<span class="health-chip warn">⚠ ${conflicts} divergence${conflicts > 1 ? "s" : ""} détectée${conflicts > 1 ? "s" : ""}</span>`;
+  sourceHealth.innerHTML += `<span class="health-chip">${checked} liens contrôlés</span>`;
+  renderDailyBrief();
 }
 
 function confidenceClass(level) {
@@ -212,8 +266,13 @@ function render() {
     const article = node.querySelector(".card");
     if (index === 0) article.classList.add("featured");
     article.dataset.confidence = confidenceClass(item.confidence_level);
+    article.classList.toggle("is-confirmed", ["confirmed", "official_confirmed"].includes(item.confidence_level));
+    article.classList.toggle("is-official", ["official", "official_confirmed"].includes(item.confidence_level));
 
-    node.querySelector(".source-mark").textContent = sourceInitial(item.source);
+    const sourceMark = node.querySelector(".source-mark");
+    sourceMark.textContent = sourceInitial(item.source);
+    sourceMark.classList.toggle("official-mark", item.trust === "official");
+    if (item.trust === "official") sourceMark.title = "Source officielle";
     node.querySelector(".source").textContent = item.source;
     node.querySelector(".age").textContent = timeAgo(item.published_at);
     node.querySelector(".score").textContent = `${item.score}/100`;
@@ -302,6 +361,20 @@ function escapeHtml(text) {
 function escapeAttr(text) {
   return String(text || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+function setTheme(theme) {
+  const allowed = ["blue", "green", "violet"];
+  const next = allowed.includes(theme) ? theme : "blue";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("businessRadarTheme", next); } catch (_) {}
+  themeButtons.forEach(button => button.classList.toggle("active", button.dataset.themeChoice === next));
+  if (themeColor) {
+    themeColor.setAttribute("content", next === "green" ? "#08090a" : next === "violet" ? "#0b0914" : "#07111d");
+  }
+}
+
+themeButtons.forEach(button => button.addEventListener("click", () => setTheme(button.dataset.themeChoice)));
+setTheme(document.documentElement.dataset.theme || "blue");
 
 async function load() {
   try {

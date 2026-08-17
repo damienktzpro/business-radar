@@ -1,11 +1,16 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-theme="blue">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#08090a" />
+  <meta name="theme-color" content="#07111d" />
   <meta name="description" content="Business Radar — veille entrepreneuriale personnelle, sources sélectionnées, liens contrôlés et confirmation multi-source." />
   <title>Business Radar</title>
+  <script>
+    try {
+      document.documentElement.dataset.theme = localStorage.getItem("businessRadarTheme") || "blue";
+    } catch (_) {}
+  </script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,15 +21,23 @@
     <div class="brand-block">
       <div class="brand-line">
         <span class="brand-dot"></span>
-        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.3</p>
+        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.4</p>
       </div>
       <h1>Business Radar</h1>
-      <p class="tagline">Ce qui se crée, se finance et accélère — sans te faire cliquer n’importe où.</p>
+      <p class="tagline">Ce qui se crée, se finance et accélère — avec des sources contrôlées et un niveau de confiance visible.</p>
       <p id="updated" class="updated">Chargement…</p>
     </div>
-    <button id="refresh" class="refresh" type="button" aria-label="Recharger les données affichées" title="Recharger le radar">
-      <span aria-hidden="true">↻</span>
-    </button>
+
+    <div class="header-actions">
+      <div class="theme-switcher" aria-label="Couleur du site" title="Changer la couleur du site">
+        <button type="button" class="theme-dot theme-blue" data-theme-choice="blue" aria-label="Thème bleu" title="Bleu nuit"></button>
+        <button type="button" class="theme-dot theme-green" data-theme-choice="green" aria-label="Thème vert" title="Vert radar"></button>
+        <button type="button" class="theme-dot theme-violet" data-theme-choice="violet" aria-label="Thème violet" title="Violet premium"></button>
+      </div>
+      <button id="refresh" class="refresh" type="button" aria-label="Recharger les données affichées" title="Recharger le radar">
+        <span aria-hidden="true">↻</span>
+      </button>
+    </div>
   </header>
 
   <main>
@@ -48,8 +61,10 @@
     <section class="snapshot" aria-label="État du radar">
       <div class="snapshot-copy">
         <span class="live-pill"><span class="live-dot"></span>RADAR ACTIF</span>
-        <h2 id="brief-title">Brief du moment</h2>
+        <h2 id="brief-title">À retenir aujourd’hui</h2>
         <p id="brief-text">Analyse des signaux et de leur niveau de confirmation…</p>
+        <div id="brief-highlights" class="brief-highlights" aria-label="Points clés du moment"></div>
+        <div id="source-health" class="source-health" aria-label="État des sources"></div>
       </div>
       <div id="stats" class="stats" aria-label="Statistiques du radar"></div>
     </section>
@@ -73,7 +88,7 @@
 
     <section class="results-head">
       <div>
-        <p class="results-kicker">SIGNALS TRIÉS PAR PERTINENCE</p>
+        <p class="results-kicker">SIGNAUX TRIÉS PAR PERTINENCE</p>
         <strong id="counter">0 signal</strong>
       </div>
       <p class="safety-note"><span aria-hidden="true">✓</span> Liens directs contrôlés avant affichage</p>

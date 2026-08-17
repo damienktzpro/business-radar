@@ -1,0 +1,28 @@
+BUSINESS RADAR V2.4 — INSTALLATION
+
+1. À la racine du dépôt GitHub business-radar, remplace :
+   - index.html
+   - app.js
+   - styles.css
+
+2. Ouvre le dossier scripts/ puis remplace :
+   - collect.py
+
+3. Ne touche pas à :
+   - .github/
+   - data/
+   - README.md
+   - requirements.txt
+
+4. Attends que GitHub Actions passe au vert.
+5. Recharge le site avec Cmd + Shift + R.
+
+NOUVEAUTÉS V2.4
+- 3 thèmes de couleur persistants : Bleu nuit (défaut), Vert radar, Violet premium
+- cartes plus compactes
+- filtres fiabilité corrigés sur desktop et mobile
+- brief "À retenir aujourd’hui"
+- source indisponible affichée par son nom
+- cartes recoupées/officielles mieux mises en avant
+- meilleure densité mobile
+- source_empty exposé dans les stats
