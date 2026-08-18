@@ -1045,3 +1045,49 @@ h3 { font-size: clamp(17.5px, 2vw, 21px); }
 @media (max-width: 420px) {
   .momentum-breakdown { grid-template-columns: 1fr; }
 }
+
+
+/* ──────────────────────────────────────────────────────────────
+   V2.10 — tri du feed
+   ────────────────────────────────────────────────────────────── */
+.results-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-2) 92%, transparent);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+.sort-control span { color: var(--muted-2); }
+.sort-control select {
+  max-width: 190px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-3);
+  color: var(--text);
+  padding: 6px 28px 6px 9px;
+  outline: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+.sort-control:focus-within { border-color: var(--accent-border); box-shadow: 0 0 0 2px var(--accent-soft); }
+@media (max-width: 720px) {
+  .results-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .results-tools { justify-content: space-between; gap: 9px; }
+  .sort-control { min-width: 0; flex: 1 1 auto; }
+  .sort-control select { min-width: 0; max-width: none; width: 100%; }
+  .safety-note { flex: 0 0 auto; max-width: 130px; }
+}

@@ -14,6 +14,9 @@ const state = {
   category: "Tout",
   confidence: "Fiables",
   query: "",
+  sort: (() => {
+    try { return localStorage.getItem("businessRadarSortV210") || "relevance"; } catch (_) { return "relevance"; }
+  })(),
   stats: {},
   favorites: new Set(readStorageJson(["businessRadarFavoritesV29", "businessRadarFavoritesV28", "businessRadarFavoritesV27", "businessRadarFavoritesV26", "businessRadarFavoritesV25", "businessRadarFavoritesV24", "businessRadarFavoritesV23", "businessRadarFavoritesV22"], [])),
   preferences: readStorageJson(["businessRadarPreferencesV29", "businessRadarPreferencesV28", "businessRadarPreferencesV27", "businessRadarPreferencesV26", "businessRadarPreferencesV25", "businessRadarPreferencesV24", "businessRadarPreferencesV23", "businessRadarPreferencesV22"], {}),
@@ -45,6 +48,8 @@ const filters = document.querySelector("#filters");
 const confidenceFilters = document.querySelector("#confidence-filters");
 const tabs = document.querySelector("#tabs");
 const search = document.querySelector("#search");
+const sortSelect = document.querySelector("#sort-select");
+const sortKicker = document.querySelector("#sort-kicker");
 const template = document.querySelector("#card-template");
 const stats = document.querySelector("#stats");
 const briefText = document.querySelector("#brief-text");
@@ -451,15 +456,46 @@ function pickDailyTop(items, limit = 3) {
   return chosen;
 }
 
+function confidenceSortWeight(item) {
+  const level = item.confidence_level || "selected";
+  return { official_confirmed: 6, confirmed: 5, official: 4, selected: 3, discovery: 1, conflict: 0 }[level] ?? 2;
+}
+
+function sortVisibleItems(items) {
+  const momentumMap = new Map(companyMomentumEntries().map(entry => [entry.key, entry.momentum]));
+  const publishedMs = item => new Date(item.published_at || 0).getTime() || 0;
+  const momentum = item => momentumMap.get(normalizedCompanyKey(item)) || 0;
+  const tieByRelevance = (a, b) => rankingScore(b) - rankingScore(a) || publishedMs(b) - publishedMs(a);
+
+  if (state.sort === "newest") return items.sort((a, b) => publishedMs(b) - publishedMs(a) || rankingScore(b) - rankingScore(a));
+  if (state.sort === "oldest") return items.sort((a, b) => publishedMs(a) - publishedMs(b) || rankingScore(b) - rankingScore(a));
+  if (state.sort === "score") return items.sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || tieByRelevance(a, b));
+  if (state.sort === "momentum") return items.sort((a, b) => momentum(b) - momentum(a) || tieByRelevance(a, b));
+  if (state.sort === "confirmed") return items.sort((a, b) => confidenceSortWeight(b) - confidenceSortWeight(a) || tieByRelevance(a, b));
+  return items.sort(tieByRelevance);
+}
+
+function renderSortControl() {
+  if (!sortSelect) return;
+  const allowed = new Set(["relevance", "newest", "score", "momentum", "confirmed", "oldest"]);
+  if (!allowed.has(state.sort)) state.sort = "relevance";
+  sortSelect.value = state.sort;
+  const labels = {
+    relevance: "PERTINENCE", newest: "DATE · PLUS RÉCENTS", score: "SCORE ARTICLE",
+    momentum: "MOMENTUM ENTREPRISE", confirmed: "NIVEAU DE CONFIRMATION", oldest: "DATE · PLUS ANCIENS"
+  };
+  if (sortKicker) sortKicker.textContent = `SIGNAUX TRIÉS PAR ${labels[state.sort] || "PERTINENCE"}`;
+}
+
 function visibleItems() {
   const q = state.query.trim().toLowerCase();
-  return state.items
+  const items = state.items
     .filter(item => {
       const catOk = state.category === "Tout" || (item.categories || []).includes(state.category);
       const haystack = `${item.title} ${item.summary || ""} ${item.why || ""} ${(item.categories || []).join(" ")} ${item.source} ${item.region || ""} ${(item.confirmation_sources || []).join(" ")}`.toLowerCase();
       return matchesView(item) && matchesConfidence(item) && catOk && (!q || haystack.includes(q));
-    })
-    .sort((a, b) => rankingScore(b) - rankingScore(a));
+    });
+  return sortVisibleItems(items);
 }
 
 function renderTabs() {
@@ -739,6 +775,7 @@ async function load() {
     renderFilters();
     renderConfidenceFilters();
     renderTabs();
+    renderSortControl();
     render();
     renderWatchlist();
   } catch (error) {
@@ -764,6 +801,13 @@ confidenceFilters.addEventListener("click", event => {
   if (!button) return;
   state.confidence = button.dataset.confidence;
   renderConfidenceFilters();
+  render();
+});
+
+if (sortSelect) sortSelect.addEventListener("change", e => {
+  state.sort = e.target.value;
+  try { localStorage.setItem("businessRadarSortV210", state.sort); } catch (_) {}
+  renderSortControl();
   render();
 });
 

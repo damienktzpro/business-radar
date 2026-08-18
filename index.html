@@ -21,10 +21,10 @@
     <div class="brand-block">
       <div class="brand-line">
         <span class="brand-dot"></span>
-        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.9</p>
+        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.10</p>
       </div>
       <h1>Business Radar</h1>
-      <p class="tagline">Ce qui se crée, se finance et accélère — avec un Momentum plus sélectif, explicable et des entreprises mieux identifiées.</p>
+      <p class="tagline">Ce qui se crée, se finance et accélère — avec un tri rapide selon ce que tu veux voir en premier.</p>
       <p id="updated" class="updated">Chargement…</p>
     </div>
 
@@ -105,10 +105,23 @@
 
     <section class="results-head">
       <div>
-        <p class="results-kicker">SIGNAUX TRIÉS PAR PERTINENCE</p>
+        <p id="sort-kicker" class="results-kicker">SIGNAUX TRIÉS PAR PERTINENCE</p>
         <strong id="counter">0 signal</strong>
       </div>
-      <p class="safety-note"><span aria-hidden="true">✓</span> Liens directs contrôlés avant affichage</p>
+      <div class="results-tools">
+        <label class="sort-control" for="sort-select">
+          <span>Trier par</span>
+          <select id="sort-select" aria-label="Trier les signaux">
+            <option value="relevance">Plus pertinent</option>
+            <option value="newest">Plus récent</option>
+            <option value="score">Score article</option>
+            <option value="momentum">Momentum entreprise</option>
+            <option value="confirmed">Confirmés d’abord</option>
+            <option value="oldest">Plus ancien</option>
+          </select>
+        </label>
+        <p class="safety-note"><span aria-hidden="true">✓</span> Liens directs contrôlés avant affichage</p>
+      </div>
     </section>
 
     <section id="feed" class="feed" aria-live="polite"></section>
