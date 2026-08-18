@@ -878,3 +878,101 @@ h3 { font-size: clamp(17.5px, 2vw, 21px); }
   .watchlist::-webkit-scrollbar { display: none; }
   .watch-card { flex: 0 0 min(82vw, 290px); }
 }
+
+/* ──────────────────────────────────────────────────────────────
+   V2.8 — Momentum entreprise, émergents et historique pré-rempli
+   ────────────────────────────────────────────────────────────── */
+.watch-section .section-heading h2 { letter-spacing: -.035em; }
+.watch-note { max-width: 620px; }
+.watchlist {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.watch-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 168px;
+  padding: 14px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent-panel) 58%, var(--panel-2)), var(--panel-3));
+}
+.watch-card.watch-emerging { border-style: dashed; }
+.watch-card.watch-active { border-color: color-mix(in srgb, var(--accent-border) 78%, var(--line)); }
+.watch-title-wrap { min-width: 0; }
+.watch-status {
+  display: inline-flex;
+  margin-bottom: 5px;
+  color: var(--accent-muted);
+  font-size: 7.5px;
+  font-weight: 950;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.watch-emerging .watch-status { color: var(--orange); }
+.momentum-score {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+  padding: 5px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.momentum-score strong { font-size: 14px; line-height: 1; }
+.momentum-score span { font-size: 8px; font-weight: 850; opacity: .76; }
+.momentum-bar {
+  height: 3px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 65%, transparent);
+}
+.momentum-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.watch-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.watch-company-search, .watch-latest {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: color-mix(in srgb, var(--panel-3) 90%, transparent);
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.watch-company-search:hover, .watch-latest:hover { color: var(--text); border-color: var(--accent-border); }
+.watch-latest { color: var(--accent-muted); }
+.company-history-note {
+  display: inline-flex;
+  margin: 0 0 10px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  color: var(--accent-muted);
+  background: var(--accent-soft);
+  font-size: 8.5px;
+  font-weight: 850;
+}
+@media (max-width: 1120px) {
+  .watchlist { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .watchlist {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 5px;
+  }
+  .watch-card { flex: 0 0 min(84vw, 310px); scroll-snap-align: start; }
+}
