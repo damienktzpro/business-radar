@@ -19,10 +19,10 @@ from urllib.parse import urlparse, urljoin
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.7 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.8 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
-# V2.7: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
+# V2.8: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
 # founder website links in the trusted feed.
 RSS_SOURCES = [
     {
@@ -223,7 +223,7 @@ PERSONAL_BOOSTS = {
     "Partenariat": 10, "Croissance": 11, "SaaS": 5, "IA": 3, "Sales": 4, "Fintech": 4, "Deeptech": 4,
 }
 
-# V2.7: the score remains entrepreneurship-first. Product features from very large platforms
+# V2.8: the score remains entrepreneurship-first. Product features from very large platforms
 # remain visible, but they should not outrank fundraising, launches, expansion, M&A or hard traction signals.
 LOW_VALUE_PATTERNS = [
     r"\bnew feature\b", r"\badds? (?:a |an )?(?:new )?feature\b", r"\bnow lets? users\b",
@@ -669,6 +669,7 @@ def make_item(*, title: str, summary: str, url: str, source: str, published_at: 
         "published_at": published_at,
         "categories": categories,
         "event": event,
+        "event_amount": event_amount(f"{title} {source_summary}", event),
         "region": region,
         "sectors": sectors,
         "score": score,
@@ -962,7 +963,7 @@ def same_signal(a: dict, b: dict) -> bool:
     same_amount = bool(amount_a and amount_b and amount_a == amount_b)
     distinctive = any(len(tok) >= 5 for tok in inter)
 
-    # V2.7: a recognized company name is strong evidence, but a funding round still needs
+    # V2.8: a recognized company name is strong evidence, but a funding round still needs
     # an amount or meaningful headline overlap so two separate rounds are not merged.
     if exact_company:
         if a.get("event") == "Levée":
@@ -1051,6 +1052,8 @@ def cluster_and_dedupe(items: Iterable[dict]) -> list[dict]:
         primary["signal_key"] = signal_identity(primary.get("company_key", ""), primary.get("event", "Business"), primary.get("title", ""), primary.get("source_excerpt", ""), primary.get("published_at", ""))
         primary["trusted_confirmation_count"] = len({i["source"] for i in trusted_cluster})
         primary["has_official_confirmation"] = any(i.get("trust") == "official" for i in trusted_cluster)
+        if not primary.get("event_amount"):
+            primary["event_amount"] = next((i.get("event_amount") for i in cluster if i.get("event_amount")), None)
 
         if level == "confirmed":
             primary["score"] = min(99, primary["score"] + 9)
