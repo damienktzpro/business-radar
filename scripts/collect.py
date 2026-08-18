@@ -19,7 +19,7 @@ from urllib.parse import urlparse, urljoin
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "feed.json"
-USER_AGENT = "BusinessRadar/2.8 (+personal entrepreneurship news reader; direct-source strict mode)"
+USER_AGENT = "BusinessRadar/2.9 (+personal entrepreneurship news reader; direct-source strict mode)"
 MAX_ITEMS = 120
 
 # V2.8: direct publisher feeds + official source pages only. No Google News redirector and no arbitrary
@@ -417,9 +417,12 @@ COUNTRY_POSSESSIVES = {
     "france", "french", "germany", "german", "spain", "spanish", "italy", "italian",
     "norway", "norwegian", "sweden", "swedish", "finland", "finnish", "denmark", "danish",
     "uk", "britain", "british", "europe", "european", "belgium", "belgian", "netherlands", "dutch",
+    "lithuania", "lithuanian", "estonia", "estonian", "latvia", "latvian", "poland", "polish",
+    "switzerland", "swiss", "austria", "austrian", "portugal", "portuguese", "ireland", "irish",
+    "czechia", "czech", "romania", "romanian", "bulgaria", "bulgarian", "croatia", "croatian",
 }
 GENERIC_ENTITY_PREFIXES = [
-    r"^(?:french|german|spanish|italian|british|european|norwegian|swedish|finnish|danish|belgian|dutch)\s+",
+    r"^(?:french|german|spanish|italian|british|european|norwegian|swedish|finnish|danish|belgian|dutch|lithuanian|estonian|latvian|polish|swiss|austrian|portuguese|irish|czech|romanian|bulgarian|croatian)\s+",
     r"^(?:ai|ia|fintech|deeptech|healthtech|climate|cyber|saas|b2b)\s+",
     r"^(?:startup|start-up|scale-up|scaleup|company|entreprise|soci[ée]t[ée])\s+",
 ]
@@ -438,7 +441,9 @@ def company_identity(title: str) -> str:
     elif m and re.match(r"^(?:new|latest|next|first)\b", m.group(2), flags=re.I):
         # “Spotify’s new feature …” still identifies Spotify as the company, even if the article is low priority.
         subject = m.group(1).strip()
-    # Remove editorial descriptors while preserving the actual company name.
+    # “Vilnius-based LITILIT”, “Paris based Acme”, “AI-based Acme” -> keep only the company.
+    subject = re.sub(r"^(?:[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9.'’ -]{0,36})[- ]based\s+", "", subject, count=1, flags=re.I).strip()
+    # Remove common editorial descriptors while preserving the actual company name.
     changed = True
     while changed:
         changed = False
@@ -1166,7 +1171,7 @@ def main() -> int:
         items = cluster_and_dedupe(items)
 
     payload = {
-        "version": "2.7",
+        "version": "2.9",
         "strict_link_mode": True,
         "direct_sources_only": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
