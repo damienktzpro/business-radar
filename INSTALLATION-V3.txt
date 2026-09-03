@@ -1,0 +1,58 @@
+INSTALLATION RAPIDE — V3.0
+===========================
+
+IMPORTANT : ne supprime pas les fichiers actuels app.js, styles.css, scripts/collect.py, data/ et .github/.
+
+1. Dans ton dépôt GitHub business-radar, remplace uniquement le fichier index.html par le nouveau index.html.
+2. Ajoute le nouveau fichier v3.css à la racine du dépôt.
+3. Ajoute le nouveau fichier v3.js à la racine du dépôt.
+4. Fais un commit sur la branche main.
+5. GitHub Actions relancera automatiquement la collecte et le déploiement.
+
+FICHIERS V3 :
+- index.html : nouvelle navigation + nouvelles pages.
+- v3.css : design des nouvelles pages.
+- v3.js : calcul des tendances, opportunités et correspondances utilisateur à partir du feed.json actuel.
+
+FICHIERS À CONSERVER SANS MODIFICATION :
+- app.js
+- styles.css
+- scripts/collect.py
+- requirements.txt
+- .github/workflows/radar.yml
+- dossier data/
+
+NOUVELLES PAGES :
+- Accueil
+- Radar
+- Tendances
+- Opportunités
+- Explorer
+- Favoris
+
+FONCTIONNEMENT :
+Le moteur V3 charge le même data/feed.json que le radar actuel. Il regroupe les signaux par secteur et calcule une force de tendance à partir de :
+- pertinence des signaux ;
+- fraîcheur ;
+- niveau de confirmation ;
+- nombre de signaux ;
+- diversité des sources ;
+- diversité des événements.
+
+Les opportunités reçoivent ensuite un indice /100 basé sur :
+- Signaux : 25 %
+- Moment : 20 %
+- Marché : 15 %
+- Faisabilité : 15 %
+- Potentiel de développement : 10 %
+- Concurrence : 10 %
+- Capital : 5 %
+
+L'Explorateur calcule en plus un score de correspondance personnel selon le budget, le temps, la compétence, le type d'activité, la zone et le risque.
+
+NOM DU SITE :
+Le nom affiché est volontairement provisoire : "RADAR".
+Quand le nom définitif sera choisi, il suffira principalement de modifier :
+- <title> dans index.html
+- le <h1>RADAR</h1>
+- éventuellement la meta description.

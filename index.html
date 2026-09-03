@@ -4,30 +4,30 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07111d" />
-  <meta name="description" content="Business Radar — veille entrepreneuriale personnelle, sources sélectionnées, liens contrôlés et confirmation multi-source." />
-  <title>Business Radar</title>
+  <meta name="description" content="Radar — signaux, tendances et opportunités entrepreneuriales détectés à partir de sources sélectionnées." />
+  <title>Radar — Signaux & Opportunités</title>
   <script>
     try {
       document.documentElement.dataset.theme = localStorage.getItem("businessRadarTheme") || "blue";
     } catch (_) {}
   </script>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="v3.css" />
 </head>
 <body>
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
 
-  <header class="topbar">
+  <header class="topbar v3-topbar">
     <div class="brand-block">
       <div class="brand-line">
         <span class="brand-dot"></span>
-        <p class="eyebrow">BUSINESS INTELLIGENCE · V2.10</p>
+        <p class="eyebrow">VEILLE & OPPORTUNITÉS · V3.0</p>
       </div>
-      <h1>Business Radar</h1>
-      <p class="tagline">Ce qui se crée, se finance et accélère — avec un tri rapide selon ce que tu veux voir en premier.</p>
+      <h1>RADAR</h1>
+      <p class="tagline">Détecter les signaux. Comprendre les tendances. Trouver les opportunités.</p>
       <p id="updated" class="updated">Chargement…</p>
     </div>
-
     <div class="header-actions">
       <div class="theme-switcher" aria-label="Couleur du site" title="Changer la couleur du site">
         <button type="button" class="theme-dot theme-blue" data-theme-choice="blue" aria-label="Thème bleu" title="Bleu nuit"></button>
@@ -41,92 +41,222 @@
   </header>
 
   <main>
-    <section class="commandbar" aria-label="Navigation et recherche">
-      <nav id="tabs" class="tabs" aria-label="Vues du radar">
-        <button class="tab active" data-view="Pour toi">Pour toi</button>
-        <button class="tab" data-view="France">France</button>
-        <button class="tab" data-view="Nouveaux business">Nouveaux business</button>
-        <button class="tab" data-view="Levées & M&A">Levées &amp; M&amp;A</button>
-        <button class="tab" data-view="Europe">Europe</button>
-        <button class="tab" data-view="Découverte">Découverte</button>
-        <button class="tab" data-view="Favoris">Favoris</button>
-      </nav>
-      <label class="search-wrap compact-search">
-        <span class="sr-only">Rechercher</span>
-        <span class="search-icon" aria-hidden="true">⌕</span>
-        <input id="search" type="search" placeholder="Rechercher une entreprise, un secteur…" autocomplete="off" />
-      </label>
-    </section>
+    <nav id="v3-nav" class="v3-nav" aria-label="Navigation principale">
+      <button class="v3-nav-btn active" data-v3-view="accueil">Accueil</button>
+      <button class="v3-nav-btn" data-v3-view="radar">Radar</button>
+      <button class="v3-nav-btn" data-v3-view="tendances">Tendances</button>
+      <button class="v3-nav-btn" data-v3-view="opportunites">Opportunités</button>
+      <button class="v3-nav-btn" data-v3-view="explorer">Explorer</button>
+      <button class="v3-nav-btn" data-v3-view="favoris">Favoris</button>
+    </nav>
 
-    <section class="snapshot" aria-label="État du radar">
-      <div class="snapshot-copy">
-        <span class="live-pill"><span class="live-dot"></span>RADAR ACTIF</span>
-        <h2 id="brief-title">À retenir aujourd’hui</h2>
-        <p id="brief-text">Analyse des signaux et de leur niveau de confirmation…</p>
-        <div id="daily-top" class="daily-top" aria-label="Trois faits majeurs du moment"></div>
-        <div id="brief-highlights" class="brief-highlights" aria-label="Points clés du moment"></div>
-        <div id="source-health" class="source-health" aria-label="État des sources"></div>
-      </div>
-      <div id="stats" class="stats" aria-label="Statistiques du radar"></div>
-    </section>
-
-
-    <section id="watch-section" class="watch-section" aria-label="Entreprises à surveiller">
-      <div class="section-heading">
+    <section id="v3-accueil" class="v3-panel active" data-v3-panel="accueil">
+      <div class="v3-hero">
         <div>
-          <p class="results-kicker">MOMENTUM · 30 JOURS</p>
-          <h2>Entreprises qui accélèrent</h2>
+          <p class="v3-kicker">VUE D’ENSEMBLE</p>
+          <h2>Ce qui mérite ton attention maintenant.</h2>
+          <p>Le moteur regroupe les signaux récents, mesure leur force et fait ressortir les secteurs où une opportunité entrepreneuriale peut commencer à se former.</p>
         </div>
-        <div class="watch-heading-actions">
-          <p class="watch-note">Momentum calculé sur les signaux distincts, la récence, les événements business et le niveau de confirmation.</p>
-          <button id="watch-toggle" class="watch-toggle" type="button" hidden>Voir toutes</button>
-        </div>
+        <div id="v3-overview-stats" class="v3-overview-stats"></div>
       </div>
-      <div id="watchlist" class="watchlist"></div>
-      <p id="watch-empty" class="watch-empty" hidden>Aucun momentum assez fort pour le moment. Le radar pré-remplit l’historique avec les signaux déjà disponibles, puis l’enrichit à chaque mise à jour.</p>
+
+      <div class="v3-section-head">
+        <div><p class="v3-kicker">OPPORTUNITÉS DU MOMENT</p><h2>À creuser en priorité</h2></div>
+        <button class="v3-link-btn" data-open-view="opportunites">Voir toutes →</button>
+      </div>
+      <div id="v3-home-opportunities" class="v3-grid"></div>
+
+      <div class="v3-section-head">
+        <div><p class="v3-kicker">TENDANCES</p><h2>Secteurs qui accélèrent</h2></div>
+        <button class="v3-link-btn" data-open-view="tendances">Voir toutes →</button>
+      </div>
+      <div id="v3-home-trends" class="v3-trend-list"></div>
+
+      <div class="v3-section-head">
+        <div><p class="v3-kicker">SIGNAUX RÉCENTS</p><h2>Derniers changements détectés</h2></div>
+        <button class="v3-link-btn" data-open-view="radar">Ouvrir le radar →</button>
+      </div>
+      <div id="v3-home-signals" class="v3-signal-strip"></div>
     </section>
 
-    <section class="controls-panel">
-      <div class="control-group">
-        <p class="control-label">Secteurs</p>
-        <div id="filters" class="filters"></div>
-      </div>
-      <div class="control-group confidence-control">
-        <p class="control-label">Fiabilité</p>
-        <div id="confidence-filters" class="filters reliability-filters">
-          <button class="filter active" data-confidence="Fiables">Fiables</button>
-          <button class="filter" data-confidence="Confirmés">Confirmés</button>
-          <button class="filter" data-confidence="Officiels">Officiels</button>
-          <button class="filter" data-confidence="Source unique">Source unique</button>
-          <button class="filter" data-confidence="À vérifier">À vérifier</button>
+    <section id="v3-radar" class="v3-panel" data-v3-panel="radar">
+      <section class="commandbar" aria-label="Navigation et recherche">
+        <nav id="tabs" class="tabs" aria-label="Vues du radar">
+          <button class="tab active" data-view="Pour toi">Pour toi</button>
+          <button class="tab" data-view="France">France</button>
+          <button class="tab" data-view="Nouveaux business">Nouveaux projets</button>
+          <button class="tab" data-view="Levées & M&A">Levées &amp; acquisitions</button>
+          <button class="tab" data-view="Europe">Europe</button>
+          <button class="tab" data-view="Découverte">Découverte</button>
+          <button class="tab" data-view="Favoris">Favoris</button>
+        </nav>
+        <label class="search-wrap compact-search">
+          <span class="sr-only">Rechercher</span>
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="search" type="search" placeholder="Rechercher une entreprise, un secteur…" autocomplete="off" />
+        </label>
+      </section>
+
+      <section class="snapshot" aria-label="État du radar">
+        <div class="snapshot-copy">
+          <span class="live-pill"><span class="live-dot"></span>RADAR ACTIF</span>
+          <h2 id="brief-title">À retenir aujourd’hui</h2>
+          <p id="brief-text">Analyse des signaux et de leur niveau de confirmation…</p>
+          <div id="daily-top" class="daily-top" aria-label="Trois faits majeurs du moment"></div>
+          <div id="brief-highlights" class="brief-highlights" aria-label="Points clés du moment"></div>
+          <div id="source-health" class="source-health" aria-label="État des sources"></div>
         </div>
-      </div>
+        <div id="stats" class="stats" aria-label="Statistiques du radar"></div>
+      </section>
+
+      <section id="watch-section" class="watch-section" aria-label="Entreprises à surveiller">
+        <div class="section-heading">
+          <div>
+            <p class="results-kicker">DYNAMIQUE · 30 JOURS</p>
+            <h2>Entreprises qui accélèrent</h2>
+          </div>
+          <div class="watch-heading-actions">
+            <p class="watch-note">Dynamique calculée sur les signaux distincts, la récence, les événements d’entreprise et le niveau de confirmation.</p>
+            <button id="watch-toggle" class="watch-toggle" type="button" hidden>Voir toutes</button>
+          </div>
+        </div>
+        <div id="watchlist" class="watchlist"></div>
+        <p id="watch-empty" class="watch-empty" hidden>Aucune dynamique assez forte pour le moment. Le radar pré-remplit l’historique avec les signaux déjà disponibles, puis l’enrichit à chaque mise à jour.</p>
+      </section>
+
+      <section class="controls-panel">
+        <div class="control-group">
+          <p class="control-label">Secteurs</p>
+          <div id="filters" class="filters"></div>
+        </div>
+        <div class="control-group confidence-control">
+          <p class="control-label">Fiabilité</p>
+          <div id="confidence-filters" class="filters reliability-filters">
+            <button class="filter active" data-confidence="Fiables">Fiables</button>
+            <button class="filter" data-confidence="Confirmés">Confirmés</button>
+            <button class="filter" data-confidence="Officiels">Officiels</button>
+            <button class="filter" data-confidence="Source unique">Source unique</button>
+            <button class="filter" data-confidence="À vérifier">À vérifier</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="results-head">
+        <div>
+          <p id="sort-kicker" class="results-kicker">SIGNAUX TRIÉS PAR PERTINENCE</p>
+          <strong id="counter">0 signal</strong>
+        </div>
+        <div class="results-tools">
+          <label class="sort-control" for="sort-select">
+            <span>Trier par</span>
+            <select id="sort-select" aria-label="Trier les signaux">
+              <option value="relevance">Plus pertinent</option>
+              <option value="newest">Plus récent</option>
+              <option value="score">Score du signal</option>
+              <option value="momentum">Dynamique de l’entreprise</option>
+              <option value="confirmed">Confirmés d’abord</option>
+              <option value="oldest">Plus ancien</option>
+            </select>
+          </label>
+          <p class="safety-note"><span aria-hidden="true">✓</span> Liens directs contrôlés avant affichage</p>
+        </div>
+      </section>
+      <section id="feed" class="feed" aria-live="polite"></section>
+      <p id="empty" class="empty" hidden>Aucun résultat avec ces filtres.</p>
     </section>
 
-    <section class="results-head">
-      <div>
-        <p id="sort-kicker" class="results-kicker">SIGNAUX TRIÉS PAR PERTINENCE</p>
-        <strong id="counter">0 signal</strong>
+    <section id="v3-tendances" class="v3-panel" data-v3-panel="tendances">
+      <div class="v3-page-intro">
+        <p class="v3-kicker">TENDANCES</p>
+        <h2>Les secteurs où les signaux se répètent.</h2>
+        <p>Une tendance est calculée à partir du nombre de signaux, de leur fraîcheur, de leur fiabilité, de la diversité des sources et des événements détectés.</p>
       </div>
-      <div class="results-tools">
-        <label class="sort-control" for="sort-select">
-          <span>Trier par</span>
-          <select id="sort-select" aria-label="Trier les signaux">
-            <option value="relevance">Plus pertinent</option>
-            <option value="newest">Plus récent</option>
-            <option value="score">Score article</option>
-            <option value="momentum">Momentum entreprise</option>
-            <option value="confirmed">Confirmés d’abord</option>
-            <option value="oldest">Plus ancien</option>
+      <div id="v3-trends" class="v3-trends-grid"></div>
+    </section>
+
+    <section id="v3-opportunites" class="v3-panel" data-v3-panel="opportunites">
+      <div class="v3-page-intro v3-page-intro-row">
+        <div>
+          <p class="v3-kicker">OPPORTUNITÉS</p>
+          <h2>Transformer les signaux du marché en pistes concrètes.</h2>
+          <p>Chaque opportunité est reliée aux signaux réellement détectés par le radar et possède un indice explicable.</p>
+        </div>
+        <div class="v3-mini-filters">
+          <button class="v3-pill active" data-opportunity-filter="toutes">Toutes</button>
+          <button class="v3-pill" data-opportunity-filter="fortes">≥ 80</button>
+          <button class="v3-pill" data-opportunity-filter="enregistrees">Enregistrées</button>
+        </div>
+      </div>
+      <div id="v3-opportunities" class="v3-grid"></div>
+    </section>
+
+    <section id="v3-explorer" class="v3-panel" data-v3-panel="explorer">
+      <div class="v3-page-intro">
+        <p class="v3-kicker">EXPLORER</p>
+        <h2>Trouver les opportunités qui correspondent à ton profil.</h2>
+        <p>Le moteur compare ton budget, ton temps, tes compétences et tes préférences avec les opportunités détectées.</p>
+      </div>
+      <form id="v3-explorer-form" class="v3-explorer-form">
+        <label>Budget disponible
+          <select name="budget">
+            <option value="1000">Moins de 1 000 €</option>
+            <option value="5000" selected>1 000 à 5 000 €</option>
+            <option value="20000">5 000 à 20 000 €</option>
+            <option value="100000">20 000 à 100 000 €</option>
+            <option value="999999">Plus de 100 000 €</option>
           </select>
         </label>
-        <p class="safety-note"><span aria-hidden="true">✓</span> Liens directs contrôlés avant affichage</p>
-      </div>
+        <label>Temps disponible
+          <select name="time">
+            <option value="faible">Quelques heures par semaine</option>
+            <option value="partiel" selected>Temps partiel</option>
+            <option value="plein">Temps plein</option>
+          </select>
+        </label>
+        <label>Compétence principale
+          <select name="skill">
+            <option value="commerce" selected>Commerce / vente</option>
+            <option value="marketing">Marketing</option>
+            <option value="tech">Technologie</option>
+            <option value="finance">Finance</option>
+            <option value="immobilier">Immobilier</option>
+            <option value="droit">Droit</option>
+            <option value="gestion">Gestion</option>
+          </select>
+        </label>
+        <label>Type d’activité
+          <select name="type">
+            <option value="tous" selected>Aucune préférence</option>
+            <option value="saas">Logiciel par abonnement</option>
+            <option value="service">Service</option>
+            <option value="marketplace">Place de marché</option>
+            <option value="commerce">Commerce</option>
+          </select>
+        </label>
+        <label>Zone
+          <select name="zone">
+            <option value="France" selected>France</option>
+            <option value="Europe">Europe</option>
+            <option value="International">International</option>
+          </select>
+        </label>
+        <label>Niveau de risque
+          <select name="risk">
+            <option value="faible">Faible</option>
+            <option value="modere" selected>Modéré</option>
+            <option value="eleve">Élevé</option>
+          </select>
+        </label>
+        <button class="v3-primary-btn" type="submit">Analyser les opportunités</button>
+      </form>
+      <div id="v3-explorer-results" class="v3-grid"></div>
     </section>
-
-    <section id="feed" class="feed" aria-live="polite"></section>
-    <p id="empty" class="empty" hidden>Aucun résultat avec ces filtres.</p>
   </main>
+
+  <dialog id="v3-opportunity-dialog" class="v3-dialog">
+    <button class="v3-dialog-close" type="button" aria-label="Fermer">×</button>
+    <div id="v3-dialog-content"></div>
+  </dialog>
 
   <template id="card-template">
     <article class="card">
@@ -135,71 +265,38 @@
         <div class="source-line">
           <span class="source-mark" aria-hidden="true"></span>
           <div class="source-meta">
-            <div class="source-name-row">
-              <span class="source"></span>
-              <span class="age"></span>
-            </div>
-            <div class="trust-row">
-              <span class="trust"></span>
-              <span class="confidence"></span>
-            </div>
+            <div class="source-name-row"><span class="source"></span><span class="age"></span></div>
+            <div class="trust-row"><span class="trust"></span><span class="confidence"></span></div>
           </div>
         </div>
-        <div class="score-wrap">
-          <span class="interest"></span>
-          <span class="score"></span>
-        </div>
+        <div class="score-wrap"><span class="interest"></span><span class="score"></span></div>
       </div>
-
       <h3></h3>
       <div class="tags"></div>
       <div class="company-history-note" hidden></div>
-
       <div class="insight-grid">
-        <div class="insight-block summary-block">
-          <span class="insight-label">EN BREF</span>
-          <p class="summary"></p>
-        </div>
-        <div class="insight-block why-block">
-          <span class="insight-label">POURQUOI ÇA COMPTE</span>
-          <p class="why-text"></p>
-        </div>
+        <div class="insight-block summary-block"><span class="insight-label">EN BREF</span><p class="summary"></p></div>
+        <div class="insight-block why-block"><span class="insight-label">POURQUOI ÇA COMPTE</span><p class="why-text"></p></div>
       </div>
-
       <div class="verification-box">
         <div class="verification-icon" aria-hidden="true">✓</div>
-        <div>
-          <strong class="verification-title"></strong>
-          <p class="confidence-note"></p>
-          <div class="confirmation-links"></div>
-        </div>
+        <div><strong class="verification-title"></strong><p class="confidence-note"></p><div class="confirmation-links"></div></div>
       </div>
-
-      <details class="score-details">
-        <summary>Comprendre le score</summary>
-        <div class="score-reasons"></div>
-      </details>
-
-      <details class="source-excerpt-wrap">
-        <summary>Voir l’extrait original</summary>
-        <p class="source-excerpt"></p>
-      </details>
-
+      <details class="score-details"><summary>Comprendre le score</summary><div class="score-reasons"></div></details>
+      <details class="source-excerpt-wrap"><summary>Voir l’extrait original</summary><p class="source-excerpt"></p></details>
       <div class="metrics"></div>
-
       <div class="card-footer">
         <div class="card-actions" aria-label="Personnaliser le radar">
           <button class="action favorite" type="button">☆ Favori</button>
           <button class="action more" type="button">↑ Plus comme ça</button>
           <button class="action less" type="button">↓ Moins comme ça</button>
         </div>
-        <a class="read" target="_blank" rel="noopener noreferrer">
-          <span class="read-label">Voir la source</span><span class="read-arrow">↗</span>
-        </a>
+        <a class="read" target="_blank" rel="noopener noreferrer"><span class="read-label">Voir la source</span><span class="read-arrow">↗</span></a>
       </div>
     </article>
   </template>
 
   <script src="app.js" defer></script>
+  <script src="v3.js" defer></script>
 </body>
 </html>
