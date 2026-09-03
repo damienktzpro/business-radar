@@ -19,6 +19,24 @@
     discovery: 0.62,
     conflict: 0.35,
   };
+
+  const SECTOR_LABELS = {
+    IA: "Intelligence artificielle",
+    SaaS: "Logiciels par abonnement",
+    Fintech: "Technologies financières",
+    "E-commerce": "Commerce en ligne",
+    Deeptech: "Technologies de rupture",
+    Climat: "Climat",
+    Healthtech: "Santé numérique",
+    Legaltech: "Technologies juridiques",
+    Proptech: "Technologies immobilières",
+    Cyber: "Cybersécurité",
+    Sales: "Vente B2B",
+  };
+
+  function sectorLabel(sector) {
+    return SECTOR_LABELS[sector] || sector || "Autre";
+  }
   const EVENT_WEIGHT = {
     "Levée": 1.18,
     Acquisition: 1.14,
@@ -245,7 +263,7 @@
       minBudget: p.minBudget, time: p.time, skills: p.skills, type: p.type, market: p.market, risk: p.risk, plan: p.plan,
       scores: { signaux: signalsScore, moment, marche: market, faisabilite: feasibility, developpement: scalability, concurrence: competition, capital },
       trend,
-      whyNow: `Le radar observe ${pieces.join(" · ")} dans ${trend.sector}. Ces éléments ne prouvent pas qu’un marché est gagné d’avance, mais ils justifient une validation terrain rapide.`,
+      whyNow: `Le radar observe ${pieces.join(" · ")} dans le secteur ${sectorLabel(trend.sector)}. Ces éléments ne prouvent pas qu’un marché est gagné d’avance, mais ils justifient une validation terrain rapide.`,
     };
   }
 
@@ -275,17 +293,29 @@
     const saved = state.saved.has(o.id);
     return `<article class="v3-opportunity-card ${o.score >= 80 ? "is-strong" : ""}" data-opportunity-id="${attr(o.id)}">
       <div class="v3-card-top">
-        <div><span class="v3-label">${esc(o.label)} · ${esc(o.sector)}</span>${match !== null ? `<div class="v3-match">Correspondance : ${match}/100</div>` : ""}</div>
+        <div class="v3-card-heading"><span class="v3-label">${esc(o.label)} · ${esc(sectorLabel(o.sector))}</span>${match !== null ? `<div class="v3-match"><span>Correspondance</span><strong>${match}/100</strong></div>` : ""}</div>
         ${scoreBadge(o.score)}
       </div>
       <h3>${esc(o.title)}</h3>
-      <p class="v3-card-copy">${esc(o.whyNow)}</p>
+      <p class="v3-card-copy">${esc(cardInsight(o))}</p>
       <div class="v3-tags"><span>${esc(o.region)}</span><span>${esc(typeLabel(o.type))}</span><span>Budget dès ${formatEuro(o.minBudget)}</span></div>
       <div class="v3-card-actions">
         <button class="v3-open-btn" type="button" data-open-opportunity="${attr(o.id)}">Approfondir</button>
         <button class="v3-save-btn ${saved ? "active" : ""}" type="button" data-save-opportunity="${attr(o.id)}">${saved ? "★ Enregistrée" : "☆ Enregistrer"}</button>
       </div>
     </article>`;
+  }
+
+  function cardInsight(o) {
+    const t = o.trend;
+    const parts = [
+      `${t.count} signal${t.count > 1 ? "aux" : ""}`,
+      `${t.uniqueSources} source${t.uniqueSources > 1 ? "s" : ""}`,
+    ];
+    if (t.fresh) parts.push(`${t.fresh} récent${t.fresh > 1 ? "s" : ""}`);
+    if (t.raises) parts.push(`${t.raises} levée${t.raises > 1 ? "s" : ""}`);
+    if (t.launches) parts.push(`${t.launches} lancement${t.launches > 1 ? "s" : ""}`);
+    return `${parts.join(" · ")}. ${o.score >= 80 ? "À valider rapidement sur le terrain." : "À surveiller et à tester avant d’investir."}`;
   }
 
   function typeLabel(type) {
@@ -306,21 +336,21 @@
     const strong = state.opportunities.filter(o => o.score >= 80).length;
     const topTrend = state.trends[0];
     $("#v3-overview-stats").innerHTML = [
-      [trusted, "signaux exploitables"],
-      [state.trends.length, "tendances suivies"],
-      [strong, "opportunités ≥ 80"],
-      [topTrend ? `${topTrend.force}/100` : "—", topTrend ? `force · ${topTrend.sector}` : "tendance principale"],
+      [trusted, trusted === 1 ? "signal exploitable" : "signaux exploitables"],
+      [state.trends.length, state.trends.length === 1 ? "dynamique suivie" : "dynamiques suivies"],
+      [strong, strong === 1 ? "opportunité ≥ 80" : "opportunités ≥ 80"],
+      [topTrend ? `${topTrend.force}/100` : "—", topTrend ? `tendance principale · ${sectorLabel(topTrend.sector)}` : "tendance principale"],
     ].map(([v,l]) => `<div class="v3-overview-stat"><strong>${esc(v)}</strong><span>${esc(l)}</span></div>`).join("");
 
     $("#v3-home-opportunities").innerHTML = state.opportunities.slice(0,3).map(o => opportunityCard(o)).join("") || emptyBlock("Pas encore assez de signaux sectoriels pour calculer des opportunités.");
-    $("#v3-home-trends").innerHTML = state.trends.slice(0,6).map(t => `<div class="v3-trend-row"><strong>${esc(t.sector)}</strong><div class="v3-progress"><span style="width:${t.force}%"></span></div><span class="v3-trend-meta">${t.force}/100 · ${t.count} signal${t.count>1?"aux":""}</span></div>`).join("") || emptyBlock("Aucune tendance disponible.");
+    $("#v3-home-trends").innerHTML = state.trends.slice(0,6).map(t => `<div class="v3-trend-row"><strong>${esc(sectorLabel(t.sector))}</strong><div class="v3-progress"><span style="width:${t.force}%"></span></div><span class="v3-trend-meta">${t.force}/100 · ${t.count} signal${t.count>1?"aux":""}</span></div>`).join("") || emptyBlock("Aucune tendance disponible.");
     const recent = [...state.items].filter(isTrusted).sort((a,b) => new Date(b.published_at)-new Date(a.published_at)).slice(0,6);
     $("#v3-home-signals").innerHTML = recent.map(i => `<article class="v3-signal-mini"><span>${esc(i.event || "Signal")} · ${esc(i.region || "International")}</span><strong>${esc(i.title)}</strong><small>${esc(i.source)} · ${Math.round(i.score || 0)}/100</small></article>`).join("");
   }
 
   function renderTrends() {
     $("#v3-trends").innerHTML = state.trends.map(t => `<article class="v3-trend-card">
-      <div class="v3-trend-card-head"><div><span class="v3-label">${esc(t.region)} · ${t.events.length} type${t.events.length>1?"s":""} de signal</span><h3>${esc(t.sector)}</h3></div><div class="v3-trend-score">${t.force}</div></div>
+      <div class="v3-trend-card-head"><div><span class="v3-label">${esc(t.region)} · ${t.events.length} type${t.events.length>1?"s":""} de signal</span><h3>${esc(sectorLabel(t.sector))}</h3></div><div class="v3-trend-score">${t.force}</div></div>
       <div class="v3-progress"><span style="width:${t.force}%"></span></div>
       <div class="v3-trend-details">
         <span><b>${t.count}</b>signaux</span><span><b>${t.uniqueSources}</b>sources</span><span><b>${t.uniqueCompanies}</b>entreprises</span><span><b>${t.fresh}</b>&lt; 7 jours</span>
@@ -388,7 +418,7 @@
     ];
     const safeSignals = o.trend.signals.filter(i => i.safe_link === true).slice(0,6);
     $("#v3-dialog-content").innerHTML = `<div class="v3-dialog-body">
-      <span class="v3-label">${esc(o.label)} · ${esc(o.sector)} · ${esc(o.region)}</span>
+      <span class="v3-label">${esc(o.label)} · ${esc(sectorLabel(o.sector))} · ${esc(o.region)}</span>
       <h2>${esc(o.title)}</h2>
       <p class="v3-dialog-lead">${esc(o.whyNow)}</p>
       <div class="v3-score-grid">${scoreRows.map(([label,value]) => `<div class="v3-score-cell"><strong>${value}/100</strong><span>${esc(label)}</span></div>`).join("")}</div>

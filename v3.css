@@ -49,12 +49,13 @@
 }
 .v3-opportunity-card.is-strong { border-color: var(--accent-border); background: linear-gradient(145deg, var(--accent-panel), var(--panel-2) 48%, var(--panel-3)); }
 .v3-card-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.v3-card-heading { min-width: 0; display: grid; gap: 8px; }
 .v3-score { flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 2px; color: var(--accent); border: 1px solid var(--accent-border); background: var(--accent-soft); padding: 7px 9px; border-radius: 10px; font-weight: 900; }
 .v3-score strong { font-size: 20px; line-height: 1; }
 .v3-score span { font-size: 9px; }
 .v3-label { color: var(--muted-2); font-size: 9px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .v3-opportunity-card h3 { margin: 14px 0 8px; font-size: 20px; }
-.v3-card-copy { color: #c1c7cd; font-size: 12px; line-height: 1.55; margin: 0 0 14px; }
+.v3-card-copy { color: #c1c7cd; font-size: 12px; line-height: 1.5; margin: 0 0 14px; }
 .v3-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
 .v3-tags span { border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; color: var(--muted); font-size: 9px; }
 .v3-card-actions { display: flex; gap: 7px; margin-top: 14px; }
@@ -94,7 +95,8 @@
 .v3-explorer-form label { color: var(--muted); font-size: 10px; font-weight: 800; }
 .v3-explorer-form select { width: 100%; margin-top: 7px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-3); color: var(--text); outline: none; }
 .v3-primary-btn { align-self: end; min-height: 40px; padding: 10px 14px; border-radius: 10px; color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
-.v3-match { display: inline-flex; gap: 4px; align-items: center; margin-top: 8px; color: var(--accent); font-size: 10px; font-weight: 850; }
+.v3-match { width: fit-content; display: inline-flex; gap: 6px; align-items: center; padding: 4px 7px; border: 1px solid var(--accent-border); border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 850; }
+.v3-match strong { font-size: 10px; }
 
 .v3-dialog { width: min(880px, calc(100% - 28px)); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid var(--line); border-radius: 22px; padding: 0; background: var(--bg); color: var(--text); box-shadow: 0 30px 100px rgba(0,0,0,.55); }
 .v3-dialog::backdrop { background: rgba(0,0,0,.68); backdrop-filter: blur(4px); }
