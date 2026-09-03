@@ -55,7 +55,7 @@
       clients: ["PME", "équipes commerciales", "cabinets spécialisés", "professions de services"],
       model: "Abonnement logiciel + frais de mise en place",
       pricing: "49 à 499 € / mois selon le cas d’usage",
-      minBudget: 1000, time: "partiel", skills: ["commerce", "tech", "marketing"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["commerce", "tech", "marketing"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 78, scalability: 92, competition: 61, capital: 83, marketBase: 86,
       plan: ["Choisir un métier et un seul problème", "Interroger 10 à 15 professionnels", "Construire une démonstration manuelle ou semi-automatique", "Obtenir 2 premiers tests payants"],
     },
@@ -66,7 +66,7 @@
       clients: ["TPE", "PME", "indépendants", "réseaux spécialisés"],
       model: "Abonnement mensuel par entreprise ou utilisateur",
       pricing: "29 à 199 € / mois",
-      minBudget: 1000, time: "partiel", skills: ["commerce", "tech", "gestion"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["commerce", "tech", "gestion"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 82, scalability: 90, competition: 67, capital: 86, marketBase: 82,
       plan: ["Identifier une profession mal servie", "Lister les trois tâches les plus pénibles", "Créer une maquette testable", "Vendre avant de développer toutes les fonctions"],
     },
@@ -77,7 +77,7 @@
       clients: ["TPE", "PME", "experts-comptables", "dirigeants"],
       model: "Abonnement B2B",
       pricing: "39 à 249 € / mois",
-      minBudget: 3000, time: "partiel", skills: ["finance", "tech", "commerce"], type: "saas", market: "entreprises", risk: "eleve",
+      minBudget: 200, time: "partiel", skills: ["finance", "tech", "commerce"], type: "saas", market: "entreprises", risk: "eleve",
       feasibility: 67, scalability: 88, competition: 55, capital: 66, marketBase: 88,
       plan: ["Cibler un problème non bancaire", "Valider les contraintes réglementaires", "Tester avec des données fictives", "Signer un partenaire ou quelques PME pilotes"],
     },
@@ -88,7 +88,7 @@
       clients: ["marques D2C", "petits e-commerçants", "agences e-commerce"],
       model: "Abonnement + éventuelle part variable",
       pricing: "49 à 299 € / mois",
-      minBudget: 1500, time: "partiel", skills: ["commerce", "marketing", "tech"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["commerce", "marketing", "tech"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 80, scalability: 87, competition: 60, capital: 80, marketBase: 80,
       plan: ["Choisir Shopify ou une seule plateforme", "Analyser 5 boutiques", "Construire un tableau de bord minimal", "Mesurer un gain concret sur marge ou stock"],
     },
@@ -99,7 +99,7 @@
       clients: ["startups deeptech", "ETI industrielles", "directions innovation", "fonds spécialisés"],
       model: "Abonnement professionnel + mise en relation qualifiée",
       pricing: "500 à 3 000 € / mois selon le service",
-      minBudget: 2000, time: "partiel", skills: ["commerce", "marketing", "gestion"], type: "service", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["commerce", "marketing", "gestion"], type: "service", market: "entreprises", risk: "modere",
       feasibility: 76, scalability: 76, competition: 72, capital: 82, marketBase: 78,
       plan: ["Choisir une verticale industrielle", "Cartographier 30 acteurs", "Qualifier 10 besoins acheteurs", "Tester une première mise en relation payante"],
     },
@@ -110,7 +110,7 @@
       clients: ["PME", "fournisseurs de grands groupes", "gestionnaires de bâtiments"],
       model: "Abonnement + accompagnement",
       pricing: "79 à 399 € / mois",
-      minBudget: 2000, time: "partiel", skills: ["gestion", "commerce", "droit"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 100, time: "partiel", skills: ["gestion", "commerce", "droit"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 74, scalability: 84, competition: 66, capital: 78, marketBase: 86,
       plan: ["Choisir une obligation ou un secteur", "Faire valider le besoin par 10 PME", "Créer un parcours de conformité simple", "Tester avec un expert partenaire"],
     },
@@ -121,7 +121,7 @@
       clients: ["cabinets", "centres de santé", "professionnels libéraux"],
       model: "Abonnement professionnel",
       pricing: "39 à 249 € / mois",
-      minBudget: 3000, time: "plein", skills: ["tech", "gestion", "commerce"], type: "saas", market: "entreprises", risk: "eleve",
+      minBudget: 300, time: "plein", skills: ["tech", "gestion", "commerce"], type: "saas", market: "entreprises", risk: "eleve",
       feasibility: 62, scalability: 84, competition: 64, capital: 61, marketBase: 90,
       plan: ["Éviter tout acte clinique dans la V1", "Valider sécurité et données", "Observer 5 professionnels", "Automatiser une seule tâche administrative"],
     },
@@ -132,7 +132,7 @@
       clients: ["TPE", "PME", "cabinets de conseil", "directions administratives"],
       model: "Abonnement + services partenaires",
       pricing: "49 à 299 € / mois",
-      minBudget: 1500, time: "partiel", skills: ["droit", "commerce", "tech"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["droit", "commerce", "tech"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 78, scalability: 85, competition: 68, capital: 84, marketBase: 82,
       plan: ["Choisir une obligation récurrente", "Cartographier le parcours actuel", "Créer un prototype de suivi", "Faire tester par des entreprises et un professionnel du droit"],
     },
@@ -143,7 +143,7 @@
       clients: ["agences immobilières", "administrateurs de biens", "syndics indépendants", "propriétaires professionnels"],
       model: "Abonnement par portefeuille ou agence",
       pricing: "49 à 249 € / mois",
-      minBudget: 1500, time: "partiel", skills: ["immobilier", "commerce", "droit", "tech"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["immobilier", "commerce", "droit", "tech"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 82, scalability: 88, competition: 72, capital: 84, marketBase: 84,
       plan: ["Choisir un type de gestionnaire", "Lister les échéances réellement pénibles", "Construire un tableau de suivi", "Tester sur 2 à 3 portefeuilles"],
     },
@@ -154,7 +154,7 @@
       clients: ["PME", "cabinets", "commerces multi-sites", "prestataires B2B"],
       model: "Abonnement de service",
       pricing: "199 à 1 500 € / mois",
-      minBudget: 3000, time: "plein", skills: ["tech", "commerce", "gestion"], type: "service", market: "entreprises", risk: "eleve",
+      minBudget: 200, time: "plein", skills: ["tech", "commerce", "gestion"], type: "service", market: "entreprises", risk: "eleve",
       feasibility: 65, scalability: 78, competition: 58, capital: 67, marketBase: 91,
       plan: ["Définir un périmètre de responsabilité strict", "Construire une offre standard", "S’appuyer sur des outils existants", "Signer 3 PME pilotes"],
     },
@@ -165,7 +165,7 @@
       clients: ["PME B2B", "agences", "éditeurs de logiciels", "équipes commerciales"],
       model: "Abonnement par équipe ou utilisateur",
       pricing: "39 à 199 € / mois",
-      minBudget: 1000, time: "partiel", skills: ["commerce", "marketing", "tech"], type: "saas", market: "entreprises", risk: "modere",
+      minBudget: 0, time: "partiel", skills: ["commerce", "marketing", "tech"], type: "saas", market: "entreprises", risk: "modere",
       feasibility: 86, scalability: 89, competition: 50, capital: 88, marketBase: 85,
       plan: ["Choisir une étape de prospection", "Tester le flux manuellement", "Mesurer le temps économisé", "Faire payer les premiers utilisateurs avant d’élargir"],
     },
@@ -298,7 +298,7 @@
       </div>
       <h3>${esc(o.title)}</h3>
       <p class="v3-card-copy">${esc(cardInsight(o))}</p>
-      <div class="v3-tags"><span>${esc(o.region)}</span><span>${esc(typeLabel(o.type))}</span><span>Budget dès ${formatEuro(o.minBudget)}</span></div>
+      <div class="v3-tags"><span>${esc(o.region)}</span><span>${esc(typeLabel(o.type))}</span><span>${budgetTag(o.minBudget)}</span></div>
       <div class="v3-card-actions">
         <button class="v3-open-btn" type="button" data-open-opportunity="${attr(o.id)}">Approfondir</button>
         <button class="v3-save-btn ${saved ? "active" : ""}" type="button" data-save-opportunity="${attr(o.id)}">${saved ? "★ Enregistrée" : "☆ Enregistrer"}</button>
@@ -329,6 +329,9 @@
   }
   function formatEuro(n) {
     return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+  }
+  function budgetTag(n) {
+    return Number(n) === 0 ? "Testable à 0 €" : `Testable dès ${formatEuro(n)}`;
   }
 
   function renderOverview() {
@@ -388,8 +391,7 @@
     const type = formData.get("type");
     const zone = formData.get("zone");
     const risk = formData.get("risk");
-    let score = 0;
-    score += budget >= o.minBudget ? 25 : Math.max(0, 25 * (budget / o.minBudget));
+    let score = 25; // seules les opportunités réellement compatibles avec le budget arrivent ici
     const timeRank = { faible: 1, partiel: 2, plein: 3 };
     score += timeRank[time] >= timeRank[o.time] ? 15 : 5;
     score += o.skills.includes(skill) ? 20 : 5;
@@ -405,8 +407,13 @@
 
   function runExplorer(form) {
     const fd = new FormData(form);
-    const ranked = state.opportunities.map(o => ({ o, match: matchOpportunity(o, fd) })).sort((a,b) => b.match - a.match || b.o.score - a.o.score);
-    $("#v3-explorer-results").innerHTML = ranked.slice(0,9).map(({o,match}) => opportunityCard(o, match)).join("") || emptyBlock("Aucune opportunité disponible pour le moment.");
+    const budget = Number(fd.get("budget"));
+    const eligible = state.opportunities.filter(o => o.minBudget <= budget);
+    const ranked = eligible.map(o => ({ o, match: matchOpportunity(o, fd) })).sort((a,b) => b.match - a.match || b.o.score - a.o.score);
+    const message = budget === 0
+      ? "Aucune opportunité testable à 0 € n’est détectée pour le moment."
+      : `Aucune opportunité détectée avec un budget initial inférieur ou égal à ${formatEuro(budget)}.`;
+    $("#v3-explorer-results").innerHTML = ranked.slice(0,9).map(({o,match}) => opportunityCard(o, match)).join("") || emptyBlock(message);
   }
 
   function openOpportunity(id) {
@@ -427,7 +434,7 @@
         <div class="v3-detail-block"><h3>L’opportunité</h3><p>${esc(o.opportunity)}</p></div>
         <div class="v3-detail-block"><h3>Clients potentiels</h3><ul>${o.clients.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>
         <div class="v3-detail-block"><h3>Modèle économique</h3><p><b>${esc(o.model)}</b><br>${esc(o.pricing)}</p></div>
-        <div class="v3-detail-block"><h3>Conditions de départ</h3><p>Budget indicatif dès <b>${formatEuro(o.minBudget)}</b><br>Temps : ${esc(timeLabel(o.time))}<br>Risque : ${esc(riskLabel(o.risk))}</p></div>
+        <div class="v3-detail-block"><h3>Conditions de départ</h3><p>Budget initial de validation : <b>${formatEuro(o.minBudget)}</b><br>Temps : ${esc(timeLabel(o.time))}<br>Risque : ${esc(riskLabel(o.risk))}</p></div>
         <div class="v3-detail-block"><h3>Compétences utiles</h3><p>${o.skills.map(s => esc(skillLabel(s))).join(" · ")}</p></div>
         <div class="v3-detail-block" style="grid-column:1/-1"><h3>Plan de validation sur 30 jours</h3><ol>${o.plan.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
       </div>

@@ -1,4 +1,4 @@
-INSTALLATION RAPIDE — V3.0
+INSTALLATION RAPIDE — V3.0.2
 ===========================
 
 IMPORTANT : ne supprime pas les fichiers actuels app.js, styles.css, scripts/collect.py, data/ et .github/.
@@ -56,3 +56,6 @@ Quand le nom définitif sera choisi, il suffira principalement de modifier :
 - <title> dans index.html
 - le <h1>RADAR</h1>
 - éventuellement la meta description.
+
+
+V3.0.2 : ajout des budgets 0 € et moins de 500 €, avec filtrage strict par budget de validation.
