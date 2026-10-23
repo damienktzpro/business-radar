@@ -1,5 +1,67 @@
-/* V3.0 — couche Signaux → Tendances → Opportunités */
-.v3-topbar { padding-bottom: 20px; }
+/* Product interface layer */
+.v3-topbar {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 46px 0 28px;
+}
+.v3-topbar::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 420px;
+  height: 260px;
+  top: -190px;
+  right: 4%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+  filter: blur(8px);
+  pointer-events: none;
+}
+.v3-topbar .brand-block,
+.v3-topbar .header-actions { position: relative; z-index: 1; }
+.v3-topbar .brand-line { margin-bottom: 13px; }
+.v3-topbar .brand-dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 5px var(--accent-soft), 0 0 22px var(--accent-glow);
+}
+.v3-topbar .eyebrow { font-size: 10px; letter-spacing: .18em; }
+.v3-topbar .brand-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: .18em;
+  margin: 0;
+  font-size: clamp(44px, 6vw, 74px);
+  line-height: .94;
+  letter-spacing: -.068em;
+}
+.v3-topbar .brand-title-business { color: var(--text); }
+.v3-topbar .brand-title-radar {
+  color: var(--accent);
+  text-shadow: 0 0 26px var(--accent-soft);
+}
+.v3-topbar .tagline {
+  max-width: 700px;
+  margin-top: 17px;
+  color: color-mix(in srgb, var(--text) 76%, var(--muted));
+  font-size: clamp(15px, 1.7vw, 18px);
+  font-weight: 590;
+  letter-spacing: -.012em;
+  line-height: 1.45;
+}
+.v3-topbar .updated {
+  max-width: 780px;
+  margin-top: 12px;
+  padding-left: 11px;
+  border-left: 2px solid var(--accent-border);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .01em;
+  line-height: 1.5;
+}
+.v3-topbar .header-actions { margin-top: 34px; }
+
 .v3-nav {
   position: sticky; top: 0; z-index: 50;
   display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none;
